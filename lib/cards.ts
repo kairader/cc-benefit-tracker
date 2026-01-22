@@ -21,9 +21,9 @@ export const cards: Card[] = [
     id: 'amex-platinum',
     name: 'Amex Platinum',
     fee: 895,
-    hue: 250,
-    textColor: 'oklch(85% 0.05 250)',
-    glowColor: 'oklch(65% 0.2 250)',
+    hue: 240,
+    textColor: 'oklch(90% 0.02 240)',
+    glowColor: 'oklch(75% 0.08 240)',
     benefits: [
       { id: 'plat-uber', name: 'Uber Cash', value: 15, cycle: 'monthly', decemberValue: 35 },
       { id: 'plat-digital', name: 'Digital Entertainment', value: 25, cycle: 'monthly' },

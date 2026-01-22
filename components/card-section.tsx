@@ -36,8 +36,8 @@ export function CardSection({ card, usageState, onToggleBenefit, index = 0, cele
             boxShadow: `
               0 0 3px 1px ${card.glowColor},
               0 0 8px 2px ${card.glowColor},
-              0 0 20px 4px oklch(65% 0.2 ${card.hue} / 0.5),
-              0 0 40px 8px oklch(65% 0.2 ${card.hue} / 0.3)
+              0 0 20px 4px ${card.glowColor.replace(')', ' / 0.5)')},
+              0 0 40px 8px ${card.glowColor.replace(')', ' / 0.3)')}
             `
           }}
         />
