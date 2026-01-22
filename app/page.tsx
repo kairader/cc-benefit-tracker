@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { cards, getBenefitValue, getAnnualBenefitValue } from '@/lib/cards'
+import { cards, getBenefitValue } from '@/lib/cards'
 import { getUsageState, toggleBenefitUsage, isBenefitUsed } from '@/lib/storage'
 import type { UsageState } from '@/lib/storage'
 import { getCurrentPeriod, getCurrentMonth } from '@/lib/periods'
@@ -10,13 +10,13 @@ import { AnimatedNumber } from '@/components/animated-number'
 
 function calculateProgress(usageState: UsageState) {
   const month = getCurrentMonth()
-  let totalAnnualValue = 0
+  let totalAnnualFees = 0
   let claimedValue = 0
 
   for (const card of cards) {
-    for (const benefit of card.benefits) {
-      totalAnnualValue += getAnnualBenefitValue(benefit)
+    totalAnnualFees += card.fee
 
+    for (const benefit of card.benefits) {
       const period = getCurrentPeriod(benefit.cycle)
       if (isBenefitUsed(benefit.id, period, usageState)) {
         claimedValue += getBenefitValue(benefit, month)
@@ -24,7 +24,7 @@ function calculateProgress(usageState: UsageState) {
     }
   }
 
-  return { totalAnnualValue, claimedValue }
+  return { totalAnnualFees, claimedValue }
 }
 
 export default function HomePage() {
@@ -43,17 +43,17 @@ export default function HomePage() {
     setUsageState({ ...newState })
   }, [])
 
-  const { totalAnnualValue, claimedValue } = calculateProgress(usageState)
+  const { totalAnnualFees, claimedValue } = calculateProgress(usageState)
 
   // Trigger celebration when reaching 100% (only on increase, not on page load)
   useEffect(() => {
-    if (mounted && claimedValue === totalAnnualValue && totalAnnualValue > 0 && prevClaimedRef.current < totalAnnualValue) {
+    if (mounted && claimedValue >= totalAnnualFees && totalAnnualFees > 0 && prevClaimedRef.current < totalAnnualFees) {
       setCelebrating(true)
       const timer = setTimeout(() => setCelebrating(false), 500)
       return () => clearTimeout(timer)
     }
     prevClaimedRef.current = claimedValue
-  }, [claimedValue, totalAnnualValue, mounted])
+  }, [claimedValue, totalAnnualFees, mounted])
 
   if (!mounted) {
     return (
@@ -70,7 +70,7 @@ export default function HomePage() {
       <div className="max-w-md mx-auto">
         <header className="mb-12 animate-fade-in">
           <p className={`text-2xl font-semibold text-white ${celebrating ? 'animate-celebrate' : ''}`}>
-            <AnimatedNumber value={claimedValue} animateOnMount /> / ${totalAnnualValue.toFixed(0)}
+            <AnimatedNumber value={claimedValue} animateOnMount /> / ${totalAnnualFees.toLocaleString()}
           </p>
         </header>
 
