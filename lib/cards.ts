@@ -62,6 +62,7 @@ export const cards: Card[] = [
     textColor: 'oklch(85% 0.08 220)',
     glowColor: 'oklch(65% 0.15 220)',
     benefits: [
+      { id: 'csp-dashpass', name: 'DashPass', value: 10, cycle: 'monthly' },
       { id: 'csp-hotel', name: 'Hotel Credit', value: 50, cycle: 'annual' },
     ],
   },
