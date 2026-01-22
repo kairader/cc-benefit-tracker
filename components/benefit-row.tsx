@@ -82,7 +82,7 @@ function getIndicators(cycle: Benefit['cycle'], usedPeriods: string[]): Indicato
 
 function StreakIndicator({ indicators }: { indicators: IndicatorInfo[] }) {
   return (
-    <div className="flex items-center gap-[3px]">
+    <div className="flex items-center gap-0.5">
       {indicators.map(({ period, status, label }) => (
         <div
           key={period}
@@ -127,18 +127,22 @@ export function BenefitRow({ benefit, isUsed, usageState, onToggle }: BenefitRow
       type="button"
       onClick={onToggle}
       aria-label={`${isUsed ? 'Mark unused' : 'Mark used'}: ${benefit.name}`}
-      className={`flex w-full items-center py-3 px-4 text-left transition-[background-color,transform,color] duration-150 hover:bg-white/5 active:bg-white/10 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950 ${
+      className={`flex w-full items-center py-3 px-3 text-left transition-[background-color,transform,color] duration-150 hover:bg-white/5 active:bg-white/10 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950 ${
         isUsed ? 'text-neutral-500 line-through' : 'text-white'
       }`}
     >
-      <span className="w-40 flex items-baseline gap-2 shrink-0 mr-16">
+      <span className="flex items-baseline gap-1.5 min-w-0">
         <span className="truncate">{benefit.name}</span>
-        <span className={`text-xs shrink-0 ${isUsed ? 'text-neutral-600' : 'text-neutral-400'}`}>
+        <span className={`text-xs shrink-0 hidden sm:inline ${isUsed ? 'text-neutral-600' : 'text-neutral-400'}`}>
           {periodLabel}
         </span>
       </span>
-      <StreakIndicator indicators={indicators} />
-      <span className="tabular-nums ml-auto">${value.toFixed(value % 1 === 0 ? 0 : 2)}</span>
+      <span className="ml-auto flex items-center gap-3">
+        <span className="w-[90px]">
+          <StreakIndicator indicators={indicators} />
+        </span>
+        <span className="tabular-nums w-16 text-right">${value.toFixed(value % 1 === 0 ? 0 : 2)}</span>
+      </span>
     </button>
   )
 }
