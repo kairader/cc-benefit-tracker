@@ -39,3 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local config
+.agents/
+.claude/
+design-engineer-auditor-package/
