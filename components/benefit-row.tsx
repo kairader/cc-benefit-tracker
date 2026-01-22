@@ -133,7 +133,7 @@ export function BenefitRow({ benefit, isUsed, usageState, onToggle }: BenefitRow
     >
       <span className="flex items-baseline gap-1.5 min-w-0">
         <span className="truncate">{benefit.name}</span>
-        <span className={`text-xs shrink-0 hidden sm:inline ${isUsed ? 'text-neutral-600' : 'text-neutral-400'}`}>
+        <span className={`text-xs shrink-0 ${isUsed ? 'text-neutral-600' : 'text-neutral-400'}`}>
           {periodLabel}
         </span>
       </span>
