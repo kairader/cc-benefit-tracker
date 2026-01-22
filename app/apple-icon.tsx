@@ -9,7 +9,7 @@ export const contentType = 'image/png'
 export default function AppleIcon() {
   const barWidth = 14
   const barHeight = 64
-  const gap = 12
+  const gap = 16
   const radius = 7
 
   const colors = ['#b8c4ce', '#e8e4dc', '#c4b896']
