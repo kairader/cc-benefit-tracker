@@ -1,6 +1,6 @@
 import { ImageResponse } from 'next/og'
 
-export const size = { width: 32, height: 32 }
+export const size = { width: 192, height: 192 }
 export const contentType = 'image/png'
 
 export default function Icon() {
@@ -16,17 +16,17 @@ export default function Icon() {
           alignItems: 'center',
           justifyContent: 'center',
           backgroundColor: '#0a0a0a',
-          gap: '4px',
+          gap: '16px',
         }}
       >
         {colors.map((color, i) => (
           <div
             key={i}
             style={{
-              width: '3px',
-              height: '14px',
+              width: '14px',
+              height: '68px',
               backgroundColor: color,
-              borderRadius: '2px',
+              borderRadius: '7px',
             }}
           />
         ))}
