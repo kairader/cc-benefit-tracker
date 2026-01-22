@@ -74,27 +74,3 @@ export function getBenefitValue(benefit: Benefit, month: number): number {
   }
   return benefit.value
 }
-
-export function getAnnualBenefitValue(benefit: Benefit): number {
-  switch (benefit.cycle) {
-    case 'monthly':
-      if (benefit.decemberValue) {
-        return benefit.value * 11 + benefit.decemberValue
-      }
-      return benefit.value * 12
-    case 'quarterly':
-      return benefit.value * 4
-    case 'semi-annual':
-      return benefit.value * 2
-    case 'annual':
-      return benefit.value
-  }
-}
-
-export function getTotalAnnualValue(): number {
-  return cards.reduce((total, card) => {
-    return total + card.benefits.reduce((cardTotal, benefit) => {
-      return cardTotal + getAnnualBenefitValue(benefit)
-    }, 0)
-  }, 0)
-}
