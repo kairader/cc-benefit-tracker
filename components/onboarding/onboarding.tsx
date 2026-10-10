@@ -13,13 +13,15 @@ type Phase = 'pick' | 'loading' | 'landing' | 'home'
 
 interface Picked {
   card: HandCard
-  data: Card
+  // Only the cards in lib/cards.ts have benefits; the rest still go in the
+  // wallet but bow out before the home screen.
+  data?: Card
   origin: FlickOrigin
 }
 
 const SLOT_W = 40
-const SLOT_H = Math.round((SLOT_W * CARD_H) / CARD_W)
-const SLOT_COUNT = hand.filter((c) => c.cardId).length
+const SLOT_GAP = 8
+const MIN_SLOTS = hand.filter((c) => c.cardId).length
 const STACK_SCALE = 1.15
 const LOADING_MS = 1700
 
@@ -34,6 +36,7 @@ interface Target {
   rotate: number
   radius: number
   faceOpacity: number
+  opacity: number
   transition: Transition
 }
 
@@ -57,22 +60,27 @@ export function Onboarding() {
   const slotRefs = useRef<(HTMLDivElement | null)[]>([])
   const viewport = useViewport()
 
+  // The wallet row grows as cards are added past the three placeholders, and
+  // the slots shrink to keep it on screen.
+  const slotCount = Math.max(MIN_SLOTS, picked.length)
+  const slotW = Math.min(SLOT_W, (viewport.w - 32 - (slotCount - 1) * SLOT_GAP) / slotCount)
+  const slotH = (slotW * CARD_H) / CARD_W
+
   useLayoutEffect(() => {
-    setSlotRects(slotRefs.current.map((el) => el!.getBoundingClientRect()))
-  }, [viewport])
+    setSlotRects(slotRefs.current.slice(0, slotCount).map((el) => el!.getBoundingClientRect()))
+  }, [viewport, slotCount])
 
   const pickedIds = useMemo(() => new Set(picked.map((p) => p.card.id)), [picked])
   const items = useMemo(() => hand.filter((c) => !pickedIds.has(c.id)), [pickedIds])
 
   const handleFlick = useCallback((card: HandCard, origin: FlickOrigin) => {
     const data = cards.find((c) => c.id === card.cardId)
-    if (!data) return false
     setPicked((prev) => [...prev, { card, data, origin }])
     return true
   }, [])
 
   // Every benefit across the picked cards, in the order they tick past while loading.
-  const benefits = useMemo(() => picked.flatMap((p) => p.data.benefits), [picked])
+  const benefits = useMemo(() => picked.flatMap((p) => p.data?.benefits ?? []), [picked])
   const foundValue = benefits
     .slice(0, tick)
     .reduce((sum, b) => sum + b.value * PER_YEAR[b.cycle], 0)
@@ -91,9 +99,9 @@ export function Onboarding() {
     }, interval)
     const done = setTimeout(() => {
       const rects: Record<string, DOMRect> = {}
-      for (const p of picked) {
-        const el = document.querySelector(`[data-glow-bar="${p.data.id}"]`)
-        if (el) rects[p.data.id] = el.getBoundingClientRect()
+      for (const { data } of picked) {
+        const el = data && document.querySelector(`[data-glow-bar="${data.id}"]`)
+        if (data && el) rects[data.id] = el.getBoundingClientRect()
       }
       setBarRects(rects)
       setPhase('landing')
@@ -110,15 +118,15 @@ export function Onboarding() {
     return () => clearTimeout(timer)
   }, [phase, picked.length])
 
-  const targetFor = (index: number, origin: FlickOrigin): Target => {
-    const base = { width: CARD_W, height: CARD_H, radius: 12, faceOpacity: 1 }
-    if (phase === 'pick') {
+  const targetFor = (index: number, origin: FlickOrigin, at: Phase = phase): Target => {
+    const base = { width: CARD_W, height: CARD_H, radius: 12, faceOpacity: 1, opacity: 1 }
+    if (at === 'pick') {
       const slot = slotRects[index]
       return {
         ...base,
         x: slot ? slot.left + slot.width / 2 : viewport.w / 2,
         y: slot ? slot.top + slot.height / 2 : 120,
-        scale: SLOT_W / CARD_W,
+        scale: slotW / CARD_W,
         rotate: 0,
         radius: 4,
         transition: {
@@ -130,7 +138,7 @@ export function Onboarding() {
         },
       }
     }
-    if (phase === 'loading') {
+    if (at === 'loading') {
       const n = picked.length
       const fromTop = n - 1 - index
       return {
@@ -143,16 +151,23 @@ export function Onboarding() {
         transition: { type: 'spring', stiffness: 200, damping: 24, delay: index * 0.05 },
       }
     }
-    const bar = barRects[picked[index].data.id]
+    const data = picked[index].data
+    const bar = data && barRects[data.id]
+    if (!bar) {
+      // No benefits to show: sink back into the stack and fade.
+      const stack = targetFor(index, origin, 'loading')
+      return { ...stack, scale: stack.scale * 0.85, opacity: 0, transition: { type: 'spring', visualDuration: 0.3, bounce: 0 } }
+    }
     return {
-      x: bar ? bar.left + bar.width / 2 : 20,
-      y: bar ? bar.top + bar.height / 2 : 100 + index * 60,
-      width: bar?.width ?? 3,
-      height: bar?.height ?? 24,
+      x: bar.left + bar.width / 2,
+      y: bar.top + bar.height / 2,
+      width: bar.width,
+      height: bar.height,
       scale: 1,
       rotate: 0,
       radius: 2,
       faceOpacity: 0,
+      opacity: 1,
       transition: {
         type: 'spring',
         stiffness: 210,
@@ -162,7 +177,7 @@ export function Onboarding() {
     }
   }
 
-  const homeCards = picked.map((p) => p.data)
+  const homeCards = picked.flatMap((p) => (p.data ? [p.data] : []))
   const showOverlay = phase !== 'home'
 
   return (
@@ -183,15 +198,15 @@ export function Onboarding() {
             >
               <h1 className="text-center text-2xl font-semibold text-white">Add your cards</h1>
 
-              <div className="mt-12 flex justify-center gap-2">
-                {Array.from({ length: SLOT_COUNT }, (_, i) => (
+              <div className="mt-12 flex justify-center" style={{ gap: SLOT_GAP }}>
+                {Array.from({ length: slotCount }, (_, i) => (
                   <div
                     key={i}
                     ref={(el) => {
                       slotRefs.current[i] = el
                     }}
                     className="rounded-[4px] border border-dashed border-neutral-800"
-                    style={{ width: SLOT_W, height: SLOT_H }}
+                    style={{ width: slotW, height: slotH }}
                   />
                 ))}
               </div>
@@ -276,7 +291,7 @@ function FlyingCard({ picked, target, shimmer }: { picked: Picked; target: Targe
     <motion.div
       className="pointer-events-none fixed left-0 top-0 z-50"
       initial={{ x: origin.x, y: origin.y }}
-      animate={{ x: target.x, y: target.y }}
+      animate={{ x: target.x, y: target.y, opacity: target.opacity }}
       transition={target.transition}
     >
       <motion.div

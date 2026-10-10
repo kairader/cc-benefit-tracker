@@ -26,9 +26,9 @@ const SPACING = RADIUS * STEP_RAD // px of horizontal drag per card
 const LIFT = 14 // how far the focused card rises out of the hand
 // Extra room the neighbours make on either side of the focused card.
 const SPREAD = (3.4 * Math.PI) / 180
-const FLICK_PROJECTION = -120 // where a released card would coast to, in px, to count as a flick
-const FLICK_DISTANCE = 80 // or how far it was pulled
-const FLICK_VELOCITY = 350 // or how fast it was moving upward (px/s)
+const FLICK_PROJECTION = -100 // where a released card would coast to, in px, to count as a flick
+const FLICK_DISTANCE = 60 // or how far it was pulled
+const FLICK_VELOCITY = 250 // or how fast it was moving upward (px/s)
 
 // Springs described by how long they take to settle and how much they overshoot,
 // the same way UIKit describes them (response + damping ratio).
@@ -123,8 +123,26 @@ export function CardFan({ items, onFlick }: CardFanProps) {
     if (stillThere !== -1) target = stillThere
     else if (focusedId && flicked.current.has(focusedId)) target = nearestAddable(items, Math.round(offset.get()))
     else target = Math.floor(max / 2)
-    animate(offset, target, settle)
+    animate(offset, target, { type: 'spring', visualDuration: 0.35, bounce: 0.1 })
   }, [items, offset])
+
+  // A touch that lands in a gap (say, while the hand is closing up after a
+  // card leaves) still picks up the card nearest the finger.
+  const nearestCardTo = (x: number, y: number) => {
+    let best: string | undefined
+    let bestDistance = Infinity
+    for (const [id, h] of handles.current) {
+      if (!items.some((c) => c.id === id)) continue
+      const r = h.el?.getBoundingClientRect()
+      if (!r || y < r.top - 24 || y > r.bottom + 24) continue
+      const distance = Math.abs(r.left + r.width / 2 - x)
+      if (distance < r.width && distance < bestDistance) {
+        best = id
+        bestDistance = distance
+      }
+    }
+    return best
+  }
 
   const register = useCallback((id: string, handle: CardHandle | null) => {
     if (handle) handles.current.set(id, handle)
@@ -146,14 +164,16 @@ export function CardFan({ items, onFlick }: CardFanProps) {
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (gesture.current) return
     e.currentTarget.setPointerCapture(e.pointerId)
-    const cardEl = (e.target as HTMLElement).closest<HTMLElement>('[data-card-id]')
+    // Cards that just left the hand can linger for a frame on their way out; ignore them.
+    const hit = (e.target as HTMLElement).closest<HTMLElement>('[data-card-id]')?.dataset.cardId
+    const cardId = hit && items.some((c) => c.id === hit) ? hit : nearestCardTo(e.clientX, e.clientY)
     offset.stop()
     gesture.current = {
       id: e.pointerId,
       x: e.clientX,
       y: e.clientY,
       startOffset: offset.get(),
-      cardId: cardEl?.dataset.cardId ?? null,
+      cardId: cardId ?? null,
       axis: null,
       samples: [{ x: e.clientX, y: e.clientY, t: e.timeStamp }],
     }
@@ -275,7 +295,7 @@ interface FanCardProps {
 
 function FanCard({ card, index, offset, lean, register }: FanCardProps) {
   const ref = useRef<HTMLDivElement>(null)
-  const slot = useSpring(index, { stiffness: 280, damping: 30 })
+  const slot = useSpring(index, { stiffness: 520, damping: 44 })
   const dragX = useMotionValue(0)
   const dragY = useMotionValue(0)
 
