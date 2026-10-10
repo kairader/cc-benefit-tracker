@@ -206,23 +206,28 @@ export function Onboarding() {
               <CardFan items={items} onFlick={handleFlick} />
             </motion.div>
 
-            <div className="pointer-events-none fixed inset-x-0 bottom-0 z-10 mx-auto max-w-md px-4 pb-[max(24px,env(safe-area-inset-bottom))]">
-              <AnimatePresence>
-                {phase === 'pick' && picked.length > 0 && (
-                  <motion.button
-                    type="button"
-                    onClick={() => setPhase('loading')}
-                    initial={{ opacity: 0, y: 40, scale: 0.96 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 20, scale: 0.96 }}
-                    whileTap={{ scale: 0.97 }}
-                    transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                    className="pointer-events-auto h-12 w-full rounded-full bg-white text-[15px] font-semibold text-neutral-950"
-                  >
-                    Add {picked.length} {picked.length === 1 ? 'card' : 'cards'}
-                  </motion.button>
-                )}
-              </AnimatePresence>
+            {/* Solid dark backing at the screen edge: Safari tints its toolbar from
+                whatever fixed element sits at the bottom, and the white button
+                alone turned it white. */}
+            <div className="pointer-events-none fixed inset-x-0 bottom-0 z-10 bg-neutral-950 px-4 pb-[max(24px,env(safe-area-inset-bottom))] before:absolute before:inset-x-0 before:-top-10 before:h-10 before:bg-gradient-to-t before:from-neutral-950 before:to-transparent before:content-['']">
+              <div className="relative mx-auto h-12 max-w-md">
+                <AnimatePresence>
+                  {phase === 'pick' && picked.length > 0 && (
+                    <motion.button
+                      type="button"
+                      onClick={() => setPhase('loading')}
+                      initial={{ opacity: 0, y: 40, scale: 0.96 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 20, scale: 0.96 }}
+                      whileTap={{ scale: 0.97 }}
+                      transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                      className="pointer-events-auto h-12 w-full rounded-full bg-white text-[15px] font-semibold text-neutral-950"
+                    >
+                      Add {picked.length} {picked.length === 1 ? 'card' : 'cards'}
+                    </motion.button>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
           </div>
 
