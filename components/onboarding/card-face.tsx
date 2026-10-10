@@ -12,7 +12,7 @@ export function CardFace({ card }: { card: HandCard }) {
       <div className="absolute inset-0 flex flex-col justify-between p-3.5">
         <span className="text-[9px] font-medium uppercase tracking-[0.12em] text-white/50">{card.issuer}</span>
         <span className="h-[18px] w-[24px] rounded-[4px] bg-white/20" />
-        <span className="text-[13px] font-semibold text-white/90">{card.name}</span>
+        <span className="text-[13px] font-semibold leading-tight text-white/90">{card.name}</span>
       </div>
     </div>
   )

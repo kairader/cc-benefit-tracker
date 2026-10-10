@@ -7,22 +7,29 @@ import {
   useMotionValue,
   useSpring,
   useTransform,
+  useVelocity,
   type MotionValue,
+  type Transition,
 } from 'framer-motion'
 import { useCallback, useEffect, useRef } from 'react'
 import type { HandCard } from '@/lib/demo-cards'
 import { CardFace } from './card-face'
 
-export const CARD_W = 236
-export const CARD_H = 149
+export const CARD_W = 150
+export const CARD_H = 238
 
-// The hand pivots around a point well below the screen, like cards held in a fist.
-const RADIUS = 620
-const STEP = 8.5 // degrees between neighbouring cards
-const SPACING = (RADIUS * STEP * Math.PI) / 180 // px of horizontal drag per card
-const LIFT = 26 // how far the focused card rises out of the hand
-const FLICK_DISTANCE = 110
-const FLICK_VELOCITY = 500
+// Cards sit on an arc around a pivot well below the screen, like a hand of cards.
+const RADIUS = 760
+const STEP = 6.2 // degrees between neighbouring cards
+const STEP_RAD = (STEP * Math.PI) / 180
+const SPACING = RADIUS * STEP_RAD // px of horizontal drag per card
+const LIFT = 30 // how far the focused card rises out of the hand
+const FLICK_PROJECTION = -150 // where a released card would coast to, in px, to count as a flick
+
+// Springs described by how long they take to settle and how much they overshoot,
+// the same way UIKit describes them (response + damping ratio).
+const settle: Transition = { type: 'spring', visualDuration: 0.5, bounce: 0.12 }
+const snapBack: Transition = { type: 'spring', visualDuration: 0.45, bounce: 0.3 }
 
 export interface FlickOrigin {
   x: number
@@ -34,8 +41,8 @@ export interface FlickOrigin {
 }
 
 interface CardHandle {
-  x: MotionValue<number>
-  y: MotionValue<number>
+  dragX: MotionValue<number>
+  dragY: MotionValue<number>
   rotate: MotionValue<number>
   scale: MotionValue<number>
   el: HTMLDivElement | null
@@ -48,12 +55,19 @@ interface CardFanProps {
 }
 
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v))
+const smoothstep = (t: number) => t * t * (3 - 2 * t)
 
+// iOS-style rubber banding: resistance grows the further past the edge you pull.
 function rubberBand(v: number, max: number) {
-  if (v < 0) return v * 0.35
-  if (v > max) return max + (v - max) * 0.35
+  const band = (over: number) => (1 - 1 / ((over * 0.55) / 2 + 1)) * 2
+  if (v < 0) return -band(-v)
+  if (v > max) return max + band(v - max)
   return v
 }
+
+// Where a moving value comes to rest given its release velocity (UIKit's
+// projection with a fast deceleration rate).
+const project = (velocity: number, rate = 0.99) => ((velocity / 1000) * rate) / (1 - rate)
 
 export function CardFan({ items, onFlick }: CardFanProps) {
   const offset = useMotionValue(Math.floor((items.length - 1) / 2))
@@ -70,6 +84,13 @@ export function CardFan({ items, onFlick }: CardFanProps) {
     samples: { x: number; y: number; t: number }[]
   } | null>(null)
 
+  // The whole hand leans into fast swipes and settles back upright.
+  const offsetVelocity = useVelocity(offset)
+  const lean = useSpring(useTransform(offsetVelocity, (v) => clamp(-v * 1.6, -7, 7)), {
+    stiffness: 300,
+    damping: 30,
+  })
+
   // Keep the focused card in focus as the hand changes. When the focused card
   // was flicked away, its neighbour slides into the gap instead.
   useEffect(() => {
@@ -83,7 +104,7 @@ export function CardFan({ items, onFlick }: CardFanProps) {
     if (stillThere !== -1) target = stillThere
     else if (focusedId && flicked.current.has(focusedId)) target = clamp(Math.round(offset.get()), 0, max)
     else target = Math.floor(max / 2)
-    animate(offset, target, { type: 'spring', stiffness: 220, damping: 30 })
+    animate(offset, target, settle)
   }, [items, offset])
 
   const register = useCallback((id: string, handle: CardHandle | null) => {
@@ -91,12 +112,15 @@ export function CardFan({ items, onFlick }: CardFanProps) {
     else handles.current.delete(id)
   }, [])
 
+  // Release velocity from the last ~80ms of movement, so a finger that slows
+  // before lifting doesn't read as a fast throw.
   const velocity = () => {
     const s = gesture.current?.samples ?? []
     if (s.length < 2) return { vx: 0, vy: 0 }
     const last = s[s.length - 1]
-    const first = s.find((p) => last.t - p.t < 100) ?? s[0]
-    const dt = Math.max(1, last.t - first.t) / 1000
+    const first = s.find((p) => last.t - p.t <= 80) ?? s[0]
+    if (first === last) return { vx: 0, vy: 0 }
+    const dt = Math.max(8, last.t - first.t) / 1000
     return { vx: (last.x - first.x) / dt, vy: (last.y - first.y) / dt }
   }
 
@@ -122,11 +146,12 @@ export function CardFan({ items, onFlick }: CardFanProps) {
     const dx = e.clientX - g.x
     const dy = e.clientY - g.y
     g.samples.push({ x: e.clientX, y: e.clientY, t: e.timeStamp })
-    if (g.samples.length > 8) g.samples.shift()
+    if (g.samples.length > 12) g.samples.shift()
 
     if (!g.axis) {
-      if (Math.hypot(dx, dy) < 6) return
-      g.axis = g.cardId && Math.abs(dy) > Math.abs(dx) * 1.1 ? 'y' : 'x'
+      if (Math.hypot(dx, dy) < 5) return
+      // Anything more upward than sideways on a card picks the card up.
+      g.axis = g.cardId && dy < 0 && Math.abs(dy) > Math.abs(dx) * 0.8 ? 'y' : 'x'
     }
 
     if (g.axis === 'x') {
@@ -134,8 +159,9 @@ export function CardFan({ items, onFlick }: CardFanProps) {
     } else {
       const h = g.cardId ? handles.current.get(g.cardId) : null
       if (!h) return
-      h.y.set(dy < 0 ? dy : dy * 0.2)
-      h.x.set(dx * 0.5)
+      // The card stays under the finger; pushing it down into the hand resists.
+      h.dragY.set(dy < 0 ? dy : dy * 0.15)
+      h.dragX.set(dx)
     }
   }
 
@@ -150,27 +176,29 @@ export function CardFan({ items, onFlick }: CardFanProps) {
     const h = g.cardId ? handles.current.get(g.cardId) : undefined
 
     if (!g.axis) {
-      // A tap brings a card to the front; tapping the front card nudges it
-      // upward as a hint that it can be flicked.
+      // A tap brings a card to the front; tapping the front card hops it up
+      // as a hint that it can be flicked.
       if (!card || !h) return
       const index = items.indexOf(card)
       if (index !== Math.round(offset.get())) {
-        animate(offset, index, { type: 'spring', stiffness: 220, damping: 30 })
+        animate(offset, index, settle)
       } else {
-        animate(h.y, [0, -34, 0], { duration: 0.5, ease: [0.3, 0, 0.2, 1] })
+        animate(h.dragY, -36, { type: 'spring', visualDuration: 0.16, bounce: 0 }).then(() =>
+          animate(h.dragY, 0, { type: 'spring', visualDuration: 0.4, bounce: 0.45 }),
+        )
       }
       return
     }
 
     if (g.axis === 'x') {
       const cardVelocity = -vx / SPACING
-      const target = clamp(Math.round(offset.get() + cardVelocity * 0.18), 0, max)
-      animate(offset, target, { type: 'spring', stiffness: 220, damping: 30, velocity: cardVelocity })
+      const target = clamp(Math.round(offset.get() + project(cardVelocity * 1000, 0.995) / 1000), 0, max)
+      animate(offset, target, { ...settle, velocity: cardVelocity })
       return
     }
 
     if (!card || !h) return
-    const isFlick = dy < -20 && (dy < -FLICK_DISTANCE || vy < -FLICK_VELOCITY)
+    const isFlick = dy < -12 && dy + project(vy) < FLICK_PROJECTION
     if (isFlick && h.el) {
       const rect = h.el.getBoundingClientRect()
       flicked.current.add(card.id)
@@ -184,13 +212,13 @@ export function CardFan({ items, onFlick }: CardFanProps) {
       })
       if (accepted) return
       flicked.current.delete(card.id)
-      // Not in the demo data: shake it off and drop it back into the hand.
-      animate(h.x, [h.x.get(), -12, 10, -6, 0], { duration: 0.45 })
-      animate(h.y, 0, { type: 'spring', stiffness: 300, damping: 18, velocity: vy })
+      // Not in the demo data: it refuses to leave and drops back into the hand.
+      animate(h.dragX, [h.dragX.get(), -14, 11, -6, 3, 0], { duration: 0.5, ease: 'easeOut' })
+      animate(h.dragY, 0, { ...snapBack, velocity: vy })
       return
     }
-    animate(h.x, 0, { type: 'spring', stiffness: 400, damping: 30 })
-    animate(h.y, 0, { type: 'spring', stiffness: 400, damping: 26, velocity: vy })
+    animate(h.dragX, 0, { ...snapBack, velocity: vx })
+    animate(h.dragY, 0, { ...snapBack, velocity: vy })
   }
 
   return (
@@ -203,7 +231,7 @@ export function CardFan({ items, onFlick }: CardFanProps) {
     >
       <AnimatePresence custom={flicked}>
         {items.map((card, index) => (
-          <FanCard key={card.id} card={card} index={index} offset={offset} register={register} />
+          <FanCard key={card.id} card={card} index={index} offset={offset} lean={lean} register={register} />
         ))}
       </AnimatePresence>
     </div>
@@ -214,69 +242,98 @@ interface FanCardProps {
   card: HandCard
   index: number
   offset: MotionValue<number>
+  lean: MotionValue<number>
   register: (id: string, handle: CardHandle | null) => void
 }
 
-function FanCard({ card, index, offset, register }: FanCardProps) {
+function FanCard({ card, index, offset, lean, register }: FanCardProps) {
   const ref = useRef<HTMLDivElement>(null)
-  const slot = useSpring(index, { stiffness: 260, damping: 30 })
-  const x = useMotionValue(0)
-  const y = useMotionValue(0)
+  const slot = useSpring(index, { stiffness: 280, damping: 30 })
+  const dragX = useMotionValue(0)
+  const dragY = useMotionValue(0)
 
   useEffect(() => {
     slot.set(index)
   }, [index, slot])
 
-  const d = useTransform(() => slot.get() - offset.get())
-  const focus = useTransform(d, (v) => Math.max(0, 1 - Math.abs(v)))
-  // As a card is pulled out of the hand it straightens up.
-  const straighten = useTransform(y, (v) => clamp(-v / 140, 0, 1))
-  const rotate = useTransform(() => d.get() * STEP * (1 - straighten.get()))
-  const lift = useTransform(() => y.get() - LIFT * focus.get())
-  const scale = useTransform(() => 1 + 0.05 * focus.get() + 0.04 * straighten.get())
-  const zIndex = useTransform(() => (y.get() < -2 ? 300 : 100 - Math.round(Math.abs(d.get()) * 10)))
-  const shade = useTransform(d, (v) => Math.min(0.5, Math.abs(v) * 0.16))
-  const fade = useTransform(d, (v) => clamp(5.5 - Math.abs(v), 0, 1))
+  // Each card trails the finger very slightly, which reads as mass.
+  const d = useSpring(
+    useTransform(() => slot.get() - offset.get()),
+    { stiffness: 900, damping: 60 },
+  )
+  const focus = useTransform(d, (v) => 1 - smoothstep(clamp(Math.abs(v), 0, 1)))
+  const lifted = useTransform(dragY, (v) => clamp(-v / 160, 0, 1))
+
+  // A held card tips in the direction it's moving, like it's pinched at the top.
+  const swing = useSpring(
+    useTransform(useVelocity(dragX), (v) => clamp(v * 0.018, -16, 16)),
+    { stiffness: 400, damping: 22 },
+  )
+  const pitch = useSpring(
+    useTransform(useVelocity(dragY), (v) => clamp(-v * 0.01, -14, 14)),
+    { stiffness: 400, damping: 24 },
+  )
+
+  const angle = useTransform(() => d.get() * STEP_RAD)
+  const x = useTransform(() => RADIUS * Math.sin(angle.get()) + dragX.get())
+  const y = useTransform(
+    () => RADIUS * (1 - Math.cos(angle.get())) - LIFT * focus.get() + dragY.get(),
+  )
+  const rotate = useTransform(
+    () => ((angle.get() * 180) / Math.PI + lean.get()) * (1 - lifted.get()) + swing.get(),
+  )
+  const scale = useTransform(() => 1 + 0.04 * focus.get() + 0.06 * lifted.get())
+  const zIndex = useTransform(() => (dragY.get() < -2 ? 300 : 100 - Math.round(Math.abs(d.get()) * 10)))
+  const shade = useTransform(d, (v) => Math.min(0.55, Math.abs(v) * 0.14))
+  const fade = useTransform(d, (v) => clamp(6 - Math.abs(v), 0, 1))
+  const shadow = useTransform(() => {
+    const l = Math.max(focus.get() * 0.4, lifted.get())
+    return `0 ${10 + l * 30}px ${24 + l * 40}px -8px rgba(0,0,0,${0.7 + l * 0.2})`
+  })
 
   useEffect(() => {
-    register(card.id, { x, y, rotate, scale, el: ref.current })
+    register(card.id, { dragX, dragY, rotate, scale, el: ref.current })
     return () => register(card.id, null)
-  }, [card.id, register, x, y, rotate, scale])
+  }, [card.id, register, dragX, dragY, rotate, scale])
 
   return (
     <motion.div
-      className="absolute left-1/2 top-[46%]"
+      className="absolute bottom-[150px] left-1/2"
       style={{
         width: CARD_W,
         height: CARD_H,
         marginLeft: -CARD_W / 2,
-        marginTop: -CARD_H / 2,
+        marginBottom: -CARD_H / 2,
+        x,
+        y,
         rotate,
+        rotateX: pitch,
+        transformPerspective: 900,
+        scale,
         zIndex,
         opacity: fade,
-        transformOrigin: `50% ${CARD_H / 2 + RADIUS}px`,
       }}
     >
       <motion.div
         variants={{
-          enter: { opacity: 0, y: 60 },
+          enter: { opacity: 0, y: 120 },
           present: { opacity: 1, y: 0 },
           exit: (flicked: React.RefObject<Set<string>>) =>
             flicked.current.has(card.id)
               ? { opacity: 0, transition: { duration: 0 } }
-              : { opacity: 0, y: 60, transition: { duration: 0.2, ease: 'easeIn' } },
+              : { opacity: 0, y: 120, transition: { type: 'spring', visualDuration: 0.3, bounce: 0 } },
         }}
         initial="enter"
         animate="present"
         exit="exit"
-        transition={{ type: 'spring', stiffness: 260, damping: 28 }}
+        transition={{ type: 'spring', visualDuration: 0.45, bounce: 0.2 }}
         className="h-full w-full"
       >
         <motion.div
           ref={ref}
           data-card-id={card.id}
-          className="relative h-full w-full rounded-[12px] shadow-[0_10px_30px_-8px_rgba(0,0,0,0.8)]"
-          style={{ x, y: lift, scale }}
+          className="relative h-full w-full rounded-[12px]"
+          style={{ boxShadow: shadow }}
         >
           <CardFace card={card} />
           <motion.div className="pointer-events-none absolute inset-0 rounded-[12px] bg-black" style={{ opacity: shade }} />

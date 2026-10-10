@@ -17,10 +17,10 @@ interface Picked {
   origin: FlickOrigin
 }
 
-const SLOT_W = 64
+const SLOT_W = 40
 const SLOT_H = Math.round((SLOT_W * CARD_H) / CARD_W)
 const SLOT_COUNT = hand.filter((c) => c.cardId).length
-const STACK_SCALE = 1.35
+const STACK_SCALE = 1.15
 const LOADING_MS = 1700
 
 const PER_YEAR: Record<Benefit['cycle'], number> = { monthly: 12, quarterly: 4, 'semi-annual': 2, annual: 1 }
@@ -187,23 +187,9 @@ export function Onboarding() {
               animate={phase === 'pick' ? { opacity: 1, y: 0, filter: 'blur(0px)' } : { opacity: 0, y: -12, filter: 'blur(4px)' }}
               transition={{ duration: 0.4, ease: 'easeOut' }}
             >
-              <h1 className="text-2xl font-semibold text-white">Add your cards</h1>
-              <p className="mt-1 h-5 text-sm text-neutral-500">
-                <AnimatePresence mode="wait" initial={false}>
-                  <motion.span
-                    key={picked.length === 0 ? 'hint' : 'count'}
-                    initial={{ opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -4 }}
-                    transition={{ duration: 0.15 }}
-                    className="inline-block"
-                  >
-                    {picked.length === 0 ? 'Flick a card up to add it' : `${picked.length} added`}
-                  </motion.span>
-                </AnimatePresence>
-              </p>
+              <h1 className="text-center text-2xl font-semibold text-white">Add your cards</h1>
 
-              <div className="mt-6 flex gap-2">
+              <div className="mt-5 flex justify-center gap-2">
                 {Array.from({ length: SLOT_COUNT }, (_, i) => (
                   <div
                     key={i}
@@ -216,7 +202,7 @@ export function Onboarding() {
                 ))}
               </div>
 
-              <label className="mt-6 flex h-10 items-center gap-2 rounded-full bg-white/5 px-4 text-neutral-500 focus-within:bg-white/10">
+              <label className="mt-5 flex h-10 items-center gap-2 rounded-full bg-white/5 px-4 text-neutral-500 focus-within:bg-white/10">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
                   <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
                   <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -236,9 +222,6 @@ export function Onboarding() {
               transition={phase === 'pick' ? { duration: 0 } : { type: 'spring', stiffness: 120, damping: 20 }}
             >
               <CardFan items={items} onFlick={handleFlick} />
-              {items.length === 0 && (
-                <p className="absolute inset-x-0 top-[30%] text-center text-sm text-neutral-600">No cards match</p>
-              )}
             </motion.div>
 
             <div className="h-28">
