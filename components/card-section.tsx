@@ -38,7 +38,7 @@ export function CardSection({ card, usageState, onToggleBenefit, index = 0, cele
       <div className="flex items-center py-2 mb-2">
         <div
           data-glow-bar={card.id}
-          className={`w-[3px] self-stretch rounded-full bg-white ${celebrating ? 'animate-glow-pulse' : ''} ${intro === 'hidden' ? 'opacity-0' : ''}`}
+          className={`w-1 self-stretch rounded-full bg-white ${celebrating ? 'animate-glow-pulse' : ''} ${intro === 'hidden' ? 'opacity-0' : ''}`}
           style={{
             boxShadow: `
               0 0 3px 1px ${card.glowColor},
@@ -48,7 +48,7 @@ export function CardSection({ card, usageState, onToggleBenefit, index = 0, cele
             `
           }}
         />
-        <h2 className={`text-base font-semibold pl-3 ${contentClass}`} style={{ color: card.textColor, ...(intro ? delay : {}) }}>{card.name}</h2>
+        <h2 className={`text-base font-medium pl-2 ${contentClass}`} style={{ color: card.textColor, ...(intro ? delay : {}) }}>{card.name}</h2>
       </div>
       <div className={contentClass} style={intro ? { animationDelay: `${180 + index * 75}ms` } : undefined}>
         {sortedBenefits.map((benefit) => {

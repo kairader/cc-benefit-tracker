@@ -22,7 +22,8 @@ interface Picked {
 const SLOT_W = 40
 const SLOT_GAP = 8
 const MIN_SLOTS = hand.filter((c) => c.cardId).length
-const STACK_SCALE = 1.15
+// 7/6 makes the front card 280 tall, so the stack's edges land on the 4px grid.
+const STACK_SCALE = 7 / 6
 const LOADING_MS = 1700
 
 const PER_YEAR: Record<Benefit['cycle'], number> = { monthly: 12, quarterly: 4, 'semi-annual': 2, annual: 1 }
@@ -64,7 +65,9 @@ export function Onboarding() {
   // the slots shrink to keep it on screen.
   const slotCount = Math.max(MIN_SLOTS, picked.length)
   const slotW = Math.min(SLOT_W, (viewport.w - 32 - (slotCount - 1) * SLOT_GAP) / slotCount)
-  const slotH = (slotW * CARD_H) / CARD_W
+  const slotH = Math.round((slotW * CARD_H) / CARD_W / 4) * 4
+  // Loading stack centre, snapped to the 4px grid.
+  const stackY = Math.round((viewport.h * 0.36) / 4) * 4
 
   useLayoutEffect(() => {
     setSlotRects(slotRefs.current.slice(0, slotCount).map((el) => el!.getBoundingClientRect()))
@@ -143,8 +146,8 @@ export function Onboarding() {
       const fromTop = n - 1 - index
       return {
         ...base,
-        x: viewport.w / 2 + (index - (n - 1) / 2) * 6,
-        y: viewport.h * 0.36 - fromTop * 14,
+        x: viewport.w / 2 + (index - (n - 1) / 2) * 8,
+        y: stackY - fromTop * 12,
         scale: STACK_SCALE - fromTop * 0.05,
         rotate: (index - (n - 1) / 2) * 4,
         radius: 16,
@@ -190,13 +193,13 @@ export function Onboarding() {
           animate={{ backgroundColor: phase === 'landing' ? 'rgba(10,10,10,0)' : 'rgba(10,10,10,1)' }}
           transition={{ duration: 0.4 }}
         >
-          <div className="mx-auto flex h-full max-w-md flex-col px-4 pt-14">
+          <div className="mx-auto flex h-full max-w-md flex-col px-4 pt-16">
             <motion.header
               initial={{ opacity: 0, filter: 'blur(4px)' }}
               animate={phase === 'pick' ? { opacity: 1, y: 0, filter: 'blur(0px)' } : { opacity: 0, y: -12, filter: 'blur(4px)' }}
               transition={{ duration: 0.4, ease: 'easeOut' }}
             >
-              <h1 className="text-center text-2xl font-semibold text-white">Add your cards</h1>
+              <h1 className="text-center text-2xl font-medium text-white">Add your cards</h1>
 
               <div className="mt-12 flex justify-center" style={{ gap: SLOT_GAP }}>
                 {Array.from({ length: slotCount }, (_, i) => (
@@ -236,7 +239,7 @@ export function Onboarding() {
                       exit={{ opacity: 0, y: 20, scale: 0.96 }}
                       whileTap={{ scale: 0.97 }}
                       transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                      className="pointer-events-auto h-12 w-full rounded-full bg-white text-[15px] font-semibold text-neutral-950"
+                      className="pointer-events-auto h-12 w-full rounded-full bg-white text-base font-medium text-neutral-950"
                     >
                       Add {picked.length} {picked.length === 1 ? 'card' : 'cards'}
                     </motion.button>
@@ -250,16 +253,16 @@ export function Onboarding() {
             {phase === 'loading' && (
               <motion.div
                 className="absolute inset-x-0 text-center"
-                style={{ top: viewport.h * 0.36 + (CARD_H * STACK_SCALE) / 2 + 44 }}
+                style={{ top: stackY + (CARD_H * STACK_SCALE) / 2 + 44 }}
                 initial={{ opacity: 0, y: 8, filter: 'blur(4px)' }}
                 animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                 exit={{ opacity: 0, filter: 'blur(4px)' }}
                 transition={{ duration: 0.3, delay: 0.15 }}
               >
-                <p className="text-2xl font-semibold text-white">
+                <p className="text-2xl font-medium text-white">
                   <AnimatedNumber value={foundValue} />
                 </p>
-                <p className="mt-1 h-5 overflow-hidden text-sm text-neutral-500">
+                <p className="mt-1 h-5 overflow-hidden text-sm text-neutral-400">
                   <AnimatePresence mode="popLayout" initial={false}>
                     <motion.span
                       key={tick}

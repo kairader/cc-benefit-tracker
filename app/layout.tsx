@@ -40,7 +40,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
-      <body className={`${geistSans.variable} font-sans antialiased bg-neutral-950`}>
+      <body className={`${geistSans.variable} font-sans font-medium antialiased bg-neutral-950`}>
         {children}
       </body>
     </html>

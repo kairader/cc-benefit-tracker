@@ -90,7 +90,9 @@ function StreakIndicator({ indicators }: { indicators: IndicatorInfo[] }) {
           title={label}
         >
           {status === 'missed' ? (
-            <span className="text-[8px] leading-none text-neutral-700">×</span>
+            <svg viewBox="0 0 4 4" className="block h-1 w-1 text-neutral-700" aria-hidden>
+              <path d="M0.5 0.5l3 3M3.5 0.5l-3 3" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+            </svg>
           ) : (
             <span
               className={`block w-1 h-1 rounded-full ${
@@ -131,14 +133,14 @@ export function BenefitRow({ benefit, isUsed, usageState, onToggle }: BenefitRow
         isUsed ? 'text-neutral-500 line-through' : 'text-white'
       }`}
     >
-      <span className="flex items-baseline gap-1.5 min-w-0">
+      <span className="flex items-baseline gap-1 min-w-0">
         <span className="truncate">{benefit.name}</span>
         <span className={`text-xs shrink-0 ${isUsed ? 'text-neutral-600' : 'text-neutral-400'}`}>
           {periodLabel}
         </span>
       </span>
       <span className="ml-auto flex items-center gap-3">
-        <span className="w-[90px]">
+        <span className="w-22">
           <StreakIndicator indicators={indicators} />
         </span>
         <span className="tabular-nums w-16 text-right">${value.toFixed(value % 1 === 0 ? 0 : 2)}</span>

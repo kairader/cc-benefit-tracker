@@ -79,7 +79,7 @@ export function HomeView({ cards, intro }: HomeViewProps) {
     <main className="min-h-screen bg-neutral-950 px-4 py-8">
       <div className="max-w-md mx-auto">
         <header className={`mb-12 ${hidden ? 'opacity-0' : 'animate-fade-in'}`}>
-          <p className={`text-2xl font-semibold text-white ${celebrating ? 'animate-celebrate' : ''}`}>
+          <p className={`text-2xl font-medium text-white ${celebrating ? 'animate-celebrate' : ''}`}>
             {hidden ? '$0' : <AnimatedNumber value={claimedValue} animateOnMount />} / ${totalAnnualFees.toLocaleString()}
           </p>
         </header>

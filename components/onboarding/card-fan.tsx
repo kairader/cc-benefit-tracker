@@ -15,15 +15,15 @@ import { useCallback, useEffect, useRef } from 'react'
 import type { HandCard } from '@/lib/demo-cards'
 import { CardFace } from './card-face'
 
-export const CARD_W = 150
-export const CARD_H = 238
+export const CARD_W = 152
+export const CARD_H = 240
 
 // Cards sit on an arc around a pivot well below the screen, like a hand of cards.
 const RADIUS = 760
 const STEP = 6.2 // degrees between neighbouring cards
 const STEP_RAD = (STEP * Math.PI) / 180
 const SPACING = RADIUS * STEP_RAD // px of horizontal drag per card
-const LIFT = 14 // how far the focused card rises out of the hand
+const LIFT = 16 // how far the focused card rises out of the hand
 // Extra room the neighbours make on either side of the focused card.
 const SPREAD = (3.4 * Math.PI) / 180
 const FLICK_PROJECTION = -100 // where a released card would coast to, in px, to count as a flick
@@ -350,7 +350,7 @@ function FanCard({ card, index, offset, lean, register }: FanCardProps) {
 
   return (
     <motion.div
-      className="absolute bottom-[250px] left-1/2"
+      className="absolute bottom-[248px] left-1/2"
       style={{
         width: CARD_W,
         height: CARD_H,
