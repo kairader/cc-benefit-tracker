@@ -183,7 +183,7 @@ export function Onboarding() {
             >
               <h1 className="text-center text-2xl font-semibold text-white">Add your cards</h1>
 
-              <div className="mt-5 flex justify-center gap-2">
+              <div className="mt-12 flex justify-center gap-2">
                 {Array.from({ length: SLOT_COUNT }, (_, i) => (
                   <div
                     key={i}
@@ -206,7 +206,7 @@ export function Onboarding() {
               <CardFan items={items} onFlick={handleFlick} />
             </motion.div>
 
-            <div className="h-28">
+            <div className="pointer-events-none fixed inset-x-0 bottom-0 z-10 mx-auto max-w-md px-4 pb-[max(24px,env(safe-area-inset-bottom))]">
               <AnimatePresence>
                 {phase === 'pick' && picked.length > 0 && (
                   <motion.button
@@ -217,7 +217,7 @@ export function Onboarding() {
                     exit={{ opacity: 0, y: 20, scale: 0.96 }}
                     whileTap={{ scale: 0.97 }}
                     transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                    className="h-12 w-full rounded-full bg-white text-[15px] font-semibold text-neutral-950"
+                    className="pointer-events-auto h-12 w-full rounded-full bg-white text-[15px] font-semibold text-neutral-950"
                   >
                     Add {picked.length} {picked.length === 1 ? 'card' : 'cards'}
                   </motion.button>

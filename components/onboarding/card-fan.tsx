@@ -26,7 +26,9 @@ const SPACING = RADIUS * STEP_RAD // px of horizontal drag per card
 const LIFT = 14 // how far the focused card rises out of the hand
 // Extra room the neighbours make on either side of the focused card.
 const SPREAD = (3.4 * Math.PI) / 180
-const FLICK_PROJECTION = -150 // where a released card would coast to, in px, to count as a flick
+const FLICK_PROJECTION = -120 // where a released card would coast to, in px, to count as a flick
+const FLICK_DISTANCE = 80 // or how far it was pulled
+const FLICK_VELOCITY = 350 // or how fast it was moving upward (px/s)
 
 // Springs described by how long they take to settle and how much they overshoot,
 // the same way UIKit describes them (response + damping ratio).
@@ -71,6 +73,21 @@ function rubberBand(v: number, max: number) {
 // projection with a fast deceleration rate).
 const project = (velocity: number, rate = 0.99) => ((velocity / 1000) * rate) / (1 - rate)
 
+// After a card leaves the hand, bring the closest card that can be added to the
+// front so the next flick works, rather than leaving a filler card in focus.
+function nearestAddable(items: HandCard[], from: number) {
+  let best = clamp(from, 0, Math.max(0, items.length - 1))
+  let bestDistance = Infinity
+  items.forEach((c, i) => {
+    const distance = Math.abs(i - from + 0.1) // ties go left, toward the cards already passed
+    if (c.cardId && distance < bestDistance) {
+      best = i
+      bestDistance = distance
+    }
+  })
+  return best
+}
+
 export function CardFan({ items, onFlick }: CardFanProps) {
   const offset = useMotionValue(Math.floor((items.length - 1) / 2))
   const handles = useRef(new Map<string, CardHandle>())
@@ -104,7 +121,7 @@ export function CardFan({ items, onFlick }: CardFanProps) {
     const stillThere = items.findIndex((c) => c.id === focusedId)
     let target: number
     if (stillThere !== -1) target = stillThere
-    else if (focusedId && flicked.current.has(focusedId)) target = clamp(Math.round(offset.get()), 0, max)
+    else if (focusedId && flicked.current.has(focusedId)) target = nearestAddable(items, Math.round(offset.get()))
     else target = Math.floor(max / 2)
     animate(offset, target, settle)
   }, [items, offset])
@@ -177,6 +194,11 @@ export function CardFan({ items, onFlick }: CardFanProps) {
     const card = g.cardId ? items.find((c) => c.id === g.cardId) : undefined
     const h = g.cardId ? handles.current.get(g.cardId) : undefined
 
+    // A touch can land while the hand is still settling; make sure it finishes on a card.
+    if (g.axis !== 'x' && offset.get() !== Math.round(offset.get())) {
+      animate(offset, clamp(Math.round(offset.get()), 0, max), settle)
+    }
+
     if (!g.axis) {
       // A tap brings a card to the front; tapping the front card hops it up
       // as a hint that it can be flicked.
@@ -200,7 +222,10 @@ export function CardFan({ items, onFlick }: CardFanProps) {
     }
 
     if (!card || !h) return
-    const isFlick = dy < -12 && dy + project(vy) < FLICK_PROJECTION
+    // Generous on purpose: a card pulled well clear of the hand, a quick upward
+    // throw, or one that would coast past the line all count.
+    const isFlick =
+      dy < -FLICK_DISTANCE || (dy < -12 && (vy < -FLICK_VELOCITY || dy + project(vy) < FLICK_PROJECTION))
     if (isFlick && h.el) {
       const rect = h.el.getBoundingClientRect()
       flicked.current.add(card.id)
@@ -305,7 +330,7 @@ function FanCard({ card, index, offset, lean, register }: FanCardProps) {
 
   return (
     <motion.div
-      className="absolute bottom-[150px] left-1/2"
+      className="absolute bottom-[250px] left-1/2"
       style={{
         width: CARD_W,
         height: CARD_H,
