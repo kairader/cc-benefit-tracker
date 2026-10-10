@@ -75,3 +75,18 @@
 .animate-glow-pulse {
   animation: glowPulse 0.5s ease-in-out;
 }
+
+/* Light sweep across cards while benefits load */
+@keyframes shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(105deg, transparent 30%, rgb(255 255 255 / 0.18) 50%, transparent 70%);
+  animation: shimmer 1.1s ease-in-out infinite;
+}

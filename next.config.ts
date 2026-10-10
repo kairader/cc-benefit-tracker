@@ -4,6 +4,7 @@ const nextConfig: NextConfig = {
   output: 'export',
   basePath: '/cc-benefit-tracker',
   images: { unoptimized: true },
+  devIndicators: false,
 };
 
 export default nextConfig;
