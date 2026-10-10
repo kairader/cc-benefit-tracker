@@ -23,7 +23,9 @@ const RADIUS = 760
 const STEP = 6.2 // degrees between neighbouring cards
 const STEP_RAD = (STEP * Math.PI) / 180
 const SPACING = RADIUS * STEP_RAD // px of horizontal drag per card
-const LIFT = 30 // how far the focused card rises out of the hand
+const LIFT = 14 // how far the focused card rises out of the hand
+// Extra room the neighbours make on either side of the focused card.
+const SPREAD = (3.4 * Math.PI) / 180
 const FLICK_PROJECTION = -150 // where a released card would coast to, in px, to count as a flick
 
 // Springs described by how long they take to settle and how much they overshoot,
@@ -274,7 +276,12 @@ function FanCard({ card, index, offset, lean, register }: FanCardProps) {
     { stiffness: 400, damping: 24 },
   )
 
-  const angle = useTransform(() => d.get() * STEP_RAD)
+  // Neighbours part around the focused card; the gap opens and closes smoothly
+  // as a card passes through the middle.
+  const angle = useTransform(() => {
+    const v = d.get()
+    return v * STEP_RAD + Math.sign(v) * SPREAD * smoothstep(clamp(Math.abs(v), 0, 1))
+  })
   const x = useTransform(() => RADIUS * Math.sin(angle.get()) + dragX.get())
   const y = useTransform(
     () => RADIUS * (1 - Math.cos(angle.get())) - LIFT * focus.get() + dragY.get(),

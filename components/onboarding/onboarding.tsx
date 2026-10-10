@@ -50,7 +50,6 @@ function useViewport() {
 
 export function Onboarding() {
   const [phase, setPhase] = useState<Phase>('pick')
-  const [query, setQuery] = useState('')
   const [picked, setPicked] = useState<Picked[]>([])
   const [slotRects, setSlotRects] = useState<DOMRect[]>([])
   const [barRects, setBarRects] = useState<Record<string, DOMRect>>({})
@@ -63,12 +62,7 @@ export function Onboarding() {
   }, [viewport])
 
   const pickedIds = useMemo(() => new Set(picked.map((p) => p.card.id)), [picked])
-  const items = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    return hand.filter(
-      (c) => !pickedIds.has(c.id) && (!q || `${c.issuer} ${c.name}`.toLowerCase().includes(q)),
-    )
-  }, [query, pickedIds])
+  const items = useMemo(() => hand.filter((c) => !pickedIds.has(c.id)), [pickedIds])
 
   const handleFlick = useCallback((card: HandCard, origin: FlickOrigin) => {
     const data = cards.find((c) => c.id === card.cardId)
@@ -202,18 +196,6 @@ export function Onboarding() {
                 ))}
               </div>
 
-              <label className="mt-5 flex h-10 items-center gap-2 rounded-full bg-white/5 px-4 text-neutral-500 focus-within:bg-white/10">
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
-                  <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
-                  <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                </svg>
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search cards"
-                  className="w-full bg-transparent text-sm text-white placeholder:text-neutral-500 focus:outline-none"
-                />
-              </label>
             </motion.header>
 
             <motion.div
