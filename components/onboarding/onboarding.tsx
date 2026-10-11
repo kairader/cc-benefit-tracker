@@ -5,9 +5,7 @@ import {
   AnimatePresence,
   motion,
   useMotionValue,
-  useSpring,
   useTransform,
-  useVelocity,
   type Transition,
 } from 'framer-motion'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
@@ -19,6 +17,7 @@ import { CardFace } from './card-face'
 import { CardFan, CARD_H, CARD_W, type FlickOrigin } from './card-fan'
 import { fx, reducedMotion, tune, useTune } from './tune'
 import { TunePanel } from './tune-panel'
+import { place, type Placed } from './pile'
 
 type Phase = 'pick' | 'loading' | 'landing' | 'home'
 
@@ -28,14 +27,16 @@ interface Picked {
   // wallet but bow out before the home screen.
   data?: Card
   origin: FlickOrigin
+  // Where it comes to rest in the pile.
+  land: Placed
 }
 
-const SLOT_W = 40
-const SLOT_GAP = 8
-const MIN_SLOTS = hand.filter((c) => c.cardId).length
 // 7/6 makes the front card 280 tall, so the stack's edges land on the 4px grid.
 const STACK_SCALE = 7 / 6
 const LOADING_MS = 1700
+// Height from the screen's bottom edge to just above the raised centre card
+// (the hand is anchored 248 up); the pile stays above it.
+const HAND_TOP = 248 + CARD_H / 2 + 40
 
 const EASE_OUT = [0.22, 1, 0.36, 1] as const
 const DATA_IDS = hand.filter((c) => c.cardId).map((c) => c.id)
@@ -53,8 +54,8 @@ interface Target {
   faceOpacity: number
   opacity: number
   shadow: number
-  // Whether arriving here is a catch (the slot gives a little).
-  catch: boolean
+  // Being dealt onto the pile: it slides to a stop like a card on a table.
+  deal: boolean
   // Folding into a glow bar: the card flashes its own colour before settling white.
   tint?: { delay: number }
   spring: { x: Transition; y: Transition; rest: Transition }
@@ -77,10 +78,8 @@ function useViewport() {
 export function Onboarding() {
   const [phase, setPhase] = useState<Phase>('pick')
   const [picked, setPicked] = useState<Picked[]>([])
-  const [slotRects, setSlotRects] = useState<DOMRect[]>([])
   const [barRects, setBarRects] = useState<Record<string, DOMRect>>({})
   const [tick, setTick] = useState(0)
-  const [catches, setCatches] = useState<number[]>([])
   const [exhale, setExhale] = useState(0)
   // Where the loading total flies to: its place in the home header.
   const [counterTo, setCounterTo] = useState<{ x: number; y: number; scale: number } | null>(null)
@@ -88,27 +87,38 @@ export function Onboarding() {
   const caught = useRef(new Set<string>())
   const [tuning] = useState(() => new URLSearchParams(window.location.search).has('tune'))
   useTune()
-  const slotRefs = useRef<(HTMLDivElement | null)[]>([])
+  const titleRef = useRef<HTMLHeadingElement>(null)
+  const pile = useRef<Placed[]>([])
   const viewport = useViewport()
 
-  // The wallet row grows as cards are added past the three placeholders, and
-  // the slots shrink to keep it on screen.
-  const slotCount = Math.max(MIN_SLOTS, picked.length)
-  const slotW = Math.min(SLOT_W, (viewport.w - 32 - (slotCount - 1) * SLOT_GAP) / slotCount)
-  const slotH = Math.round((slotW * CARD_H) / CARD_W / 4) * 4
   // Loading stack centre, snapped to the 4px grid.
   const stackY = Math.round((viewport.h * 0.36) / 4) * 4
-
-  useLayoutEffect(() => {
-    setSlotRects(slotRefs.current.slice(0, slotCount).map((el) => el!.getBoundingClientRect()))
-  }, [viewport, slotCount])
 
   const pickedIds = useMemo(() => new Set(picked.map((p) => p.card.id)), [picked])
   const items = useMemo(() => hand.filter((c) => !pickedIds.has(c.id)), [pickedIds])
 
   const handleFlick = useCallback((card: HandCard, origin: FlickOrigin) => {
     const data = cards.find((c) => c.id === card.cardId)
-    setPicked((prev) => [...prev, { card, data, origin }])
+    // Where the flick alone would leave it: sliding on with the table's
+    // friction, still turning with the spin it left the hand with.
+    const friction = tune.friction.get()
+    const spin = (origin.vr + origin.vx * 0.06) * fx('spinCarry')
+    const ideal = {
+      x: origin.x + origin.vx * friction,
+      y: origin.y + origin.vy * friction,
+      rotate: clamp(origin.rotate + spin * friction + (Math.random() * 2 - 1) * fx('scatter'), -24, 24),
+    }
+    // The table is the space between the title and the top of the hand.
+    const title = titleRef.current?.getBoundingClientRect()
+    const zone = {
+      left: 16,
+      right: window.innerWidth - 16,
+      top: (title?.bottom ?? 96) + 24,
+      bottom: window.innerHeight - HAND_TOP,
+    }
+    const land = place(ideal, pile.current, zone, tune.pileScale.get(), tune.reveal.get())
+    pile.current.push(land)
+    setPicked((prev) => [...prev, { card, data, origin, land }])
     return true
   }, [])
 
@@ -160,26 +170,18 @@ export function Onboarding() {
   }, [phase, picked.length])
 
   const targetFor = (index: number, origin: FlickOrigin, at: Phase = phase): Target => {
-    const base = { width: CARD_W, height: CARD_H, radius: 12, faceOpacity: 1, opacity: 1, catch: false }
+    const base = { width: CARD_W, height: CARD_H, radius: 12, faceOpacity: 1, opacity: 1, deal: false }
     if (at === 'pick') {
-      const slot = slotRects[index]
-      // Vertical and sideways run on different springs, so a thrown card
-      // travels on a curve rather than a straight line.
-      const y: Transition = { type: 'spring', stiffness: tune.flightYStiffness.get(), damping: tune.flightYDamping.get() }
+      const { land } = picked[index]
+      const pileScale = tune.pileScale.get()
       return {
         ...base,
-        x: slot ? slot.left + slot.width / 2 : viewport.w / 2,
-        y: slot ? slot.top + slot.height / 2 : 120,
-        scale: slotW / CARD_W,
-        rotate: 0,
-        radius: 4,
-        shadow: 0.2,
-        catch: true,
-        spring: {
-          x: { type: 'spring', stiffness: tune.flightXStiffness.get(), damping: tune.flightXDamping.get() },
-          y,
-          rest: y,
-        },
+        ...land,
+        scale: pileScale,
+        radius: 12 * pileScale,
+        shadow: 0.15,
+        deal: true,
+        spring: same({ type: 'spring', visualDuration: 0.4, bounce: 0 }),
       }
     }
     if (at === 'loading') {
@@ -215,7 +217,7 @@ export function Onboarding() {
       faceOpacity: 0,
       opacity: 1,
       shadow: 0,
-      catch: false,
+      deal: false,
       tint: { delay },
       spring: same({ type: 'spring', stiffness: 210, damping: 28, delay }),
     }
@@ -224,12 +226,7 @@ export function Onboarding() {
   const homeCards = picked.flatMap((p) => (p.data ? [p.data] : []))
   const totalFound = benefits.reduce((sum, b) => sum + b.value * PER_YEAR[b.cycle], 0)
 
-  const handleCatch = (i: number) => {
-    setCatches((prev) => {
-      const next = [...prev]
-      next[i] = (next[i] ?? 0) + 1
-      return next
-    })
+  const handleLand = (i: number) => {
     caught.current.add(picked[i].card.id)
     if (!exhale && DATA_IDS.every((id) => caught.current.has(id))) setExhale(1)
   }
@@ -254,33 +251,9 @@ export function Onboarding() {
               animate={phase === 'pick' ? { opacity: 1, filter: 'blur(0px)' } : { opacity: 0, filter: 'blur(2px)' }}
               transition={phase === 'pick' ? { duration: 0.4, ease: 'easeOut' } : { duration: 0.2, ease: EASE_OUT }}
             >
-              <h1 className="text-center text-2xl font-medium text-white">Add your cards</h1>
-
-              <div className="mt-10 flex justify-center" style={{ gap: SLOT_GAP }}>
-                {Array.from({ length: slotCount }, (_, i) => (
-                  <div
-                    key={i}
-                    ref={(el) => {
-                      slotRefs.current[i] = el
-                    }}
-                    className="relative rounded-[4px] border border-dashed border-neutral-800"
-                    style={{ width: slotW, height: slotH }}
-                  >
-                    {/* A ring that spreads out as a card is caught. */}
-                    {catches[i] > 0 && fx('landRipple') > 0 && (
-                      <motion.div
-                        key={catches[i]}
-                        className="pointer-events-none absolute -inset-px rounded-[4px] border"
-                        // Tinted with the caught card's own colour.
-                        style={{ borderColor: `oklch(80% 0.12 ${picked[i]?.card.hue ?? 0} / 0.7)` }}
-                        initial={{ opacity: 1, scale: 1 }}
-                        animate={{ opacity: 0, scale: 1.4 }}
-                        transition={{ duration: 0.5, ease: 'easeOut' }}
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
+              <h1 ref={titleRef} className="text-center text-2xl font-medium text-white">
+                Add your cards
+              </h1>
 
             </motion.header>
 
@@ -375,7 +348,7 @@ export function Onboarding() {
             key={p.card.id}
             picked={p}
             target={targetFor(i, p.origin)}
-            onCatch={() => handleCatch(i)}
+            onLand={() => handleLand(i)}
           />
         ))}
 
@@ -384,7 +357,7 @@ export function Onboarding() {
   )
 }
 
-function FlyingCard({ picked, target, onCatch }: { picked: Picked; target: Target; onCatch: () => void }) {
+function FlyingCard({ picked, target, onLand }: { picked: Picked; target: Target; onLand: () => void }) {
   const { origin, card, data } = picked
   // Starts exactly as the card left the hand: same place, turn, tilt, scale
   // and shadow, moving at the same speed.
@@ -401,22 +374,16 @@ function FlyingCard({ picked, target, onCatch }: { picked: Picked; target: Targe
   const radius = useMotionValue(12 * origin.scale)
   const opacity = useMotionValue(1)
   const shadow = useMotionValue(origin.shadow)
-  const catchY = useMotionValue(0)
-  const squash = useMotionValue(0)
+  // Height off the table while it's tossed: it grows a little and casts a
+  // longer shadow, then settles.
+  const hop = useMotionValue(0)
   const tint = useMotionValue(0)
 
-  // Leans into its sideways travel, like it's cutting through air.
-  const tilt = useSpring(
-    useTransform(useVelocity(x), (v) => clamp((v * fx('flightTilt')) / 1000, -20, 20)),
-    { stiffness: 300, damping: 30 },
-  )
-  const rotate = useTransform(() => spin.get() + tilt.get())
-  const top = useTransform(() => y.get() + catchY.get())
-  const scaleX = useTransform(() => foldX.get() * (1 + squash.get() * 0.6))
-  const scaleY = useTransform(() => foldY.get() * (1 - squash.get()))
-  const shadowY = useTransform(shadow, (l) => l * 24)
-  const shadowScale = useTransform(shadow, (l) => 0.96 + l * 0.06)
-  const shadowOpacity = useTransform(shadow, (l) => 0.55 + l * 0.45)
+  const size = useTransform(() => scale.get() * (1 + hop.get()))
+  const lift = useTransform(() => Math.min(1, shadow.get() + hop.get() * 5))
+  const shadowY = useTransform(lift, (l) => l * 24)
+  const shadowScale = useTransform(lift, (l) => 0.96 + l * 0.06)
+  const shadowOpacity = useTransform(lift, (l) => 0.55 + l * 0.45)
   // Elliptical corners in the card's own space, so they stay round on screen
   // however unevenly it's squeezed.
   const borderRadius = useTransform(() => {
@@ -426,10 +393,10 @@ function FlyingCard({ picked, target, onCatch }: { picked: Picked; target: Targe
   })
 
   const targetRef = useRef(target)
-  const onCatchRef = useRef(onCatch)
+  const onLandRef = useRef(onLand)
   useLayoutEffect(() => {
     targetRef.current = target
-    onCatchRef.current = onCatch
+    onLandRef.current = onLand
   })
   const launched = useRef(false)
   const key = [target.x, target.y, target.scale, target.rotate, target.width, target.height, target.radius, target.opacity, target.shadow].join()
@@ -462,14 +429,53 @@ function FlyingCard({ picked, target, onCatch }: { picked: Picked; target: Targe
       opacity.jump(0)
       const fade = { duration: 0.2, ease: EASE_OUT }
       const runs = [animate(scale, t.scale, fade), animate(opacity, t.opacity, fade)]
-      if (t.catch) onCatchRef.current()
+      if (t.deal && first) onLandRef.current()
       return () => runs.forEach((r) => r.stop())
     }
 
+    if (first && t.deal) {
+      // Dealt onto the table: it leaves at the flick's speed and slides to a
+      // stop under friction, so a harder flick travels further. If the pile
+      // nudged its spot, the glide is stretched or shortened to match, which
+      // keeps the starting speed true to the flick.
+      const friction = tune.friction.get()
+      const natural = Math.hypot(origin.vx, origin.vy) * friction
+      const distance = Math.hypot(t.x - x.get(), t.y - y.get())
+      const tau = friction * clamp(natural > 1 ? distance / natural : 1.6, 0.4, 1.6)
+      const glide = (mv: typeof x, to: number, restDelta = 0.01) =>
+        animate(mv, to, {
+          type: 'inertia',
+          velocity: (to - mv.get()) / tau,
+          power: 1,
+          timeConstant: tau * 1000,
+          modifyTarget: () => to,
+          restDelta,
+        })
+      const runs = [
+        glide(x, t.x, 0.2),
+        glide(y, t.y, 0.2),
+        glide(spin, t.rotate),
+        glide(pitch, 0),
+        glide(scale, t.scale, 0.001),
+        glide(radius, t.radius),
+        glide(shadow, t.shadow, 0.001),
+      ]
+      const toss = fx('toss')
+      const air = tau * 4
+      const flight = animate(hop, [0, toss, 0], { duration: air, times: [0, 0.3, 1], ease: ['easeOut', 'easeIn'] })
+      // Touchdown.
+      const landed = setTimeout(() => onLandRef.current(), air * 1000)
+      return () => {
+        runs.forEach((r) => r.stop())
+        flight.stop()
+        clearTimeout(landed)
+      }
+    }
+
     const runs = [
-      animate(x, t.x, first ? { ...t.spring.x, velocity: origin.vx } : t.spring.x),
-      animate(y, t.y, first ? { ...t.spring.y, velocity: origin.vy } : t.spring.y),
-      animate(spin, t.rotate, first ? { ...t.spring.rest, velocity: origin.vr * fx('spinCarry') } : t.spring.rest),
+      animate(x, t.x, t.spring.x),
+      animate(y, t.y, t.spring.y),
+      animate(spin, t.rotate, t.spring.rest),
       animate(pitch, 0, t.spring.rest),
       animate(scale, t.scale, t.spring.rest),
       animate(foldX, t.width / CARD_W, t.spring.rest),
@@ -478,27 +484,11 @@ function FlyingCard({ picked, target, onCatch }: { picked: Picked; target: Targe
       animate(opacity, t.opacity, t.spring.rest),
       animate(shadow, t.shadow, t.spring.rest),
     ]
-    // The first moment it reaches the slot, the slot gives a little and the
-    // card squashes against it.
-    let caught = !t.catch
-    const check = () => {
-      if (caught || Math.hypot(x.get() - t.x, y.get() - t.y) > 2) return
-      caught = true
-      const dip = fx('landDip')
-      if (dip) animate(catchY, 0, { type: 'spring', velocity: -dip * 36, stiffness: 500, damping: 18 })
-      const amount = fx('landSquash')
-      if (amount) animate(squash, 0, { type: 'spring', velocity: amount * 40, stiffness: 600, damping: 20 })
-      onCatchRef.current()
-    }
-    const unsubscribe = [x.on('change', check), y.on('change', check)]
-    return () => {
-      runs.forEach((r) => r.stop())
-      unsubscribe.forEach((u) => u())
-    }
-  }, [key, origin, x, y, spin, pitch, scale, foldX, foldY, radius, opacity, shadow, catchY, squash, tint])
+    return () => runs.forEach((r) => r.stop())
+  }, [key, origin, x, y, spin, pitch, scale, foldX, foldY, radius, opacity, shadow, hop, tint])
 
   return (
-    <motion.div className="pointer-events-none fixed left-0 top-0 z-50" style={{ x, y: top, opacity }}>
+    <motion.div className="pointer-events-none fixed left-0 top-0 z-50" style={{ x, y, opacity }}>
       <motion.div
         className="absolute left-0 top-0 will-change-transform"
         style={{
@@ -506,10 +496,10 @@ function FlyingCard({ picked, target, onCatch }: { picked: Picked; target: Targe
           y: '-50%',
           width: CARD_W,
           height: CARD_H,
-          scale,
-          scaleX,
-          scaleY,
-          rotate,
+          scale: size,
+          scaleX: foldX,
+          scaleY: foldY,
+          rotate: spin,
           rotateX: pitch,
           transformPerspective: 900,
         }}

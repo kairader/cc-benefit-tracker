@@ -47,18 +47,13 @@ const defs = {
   snapBackDuration: { group: 'Flick', label: 'Drop-back time', value: 0.45, min: 0.2, max: 1, step: 0.05 },
   snapBackBounce: { group: 'Flick', label: 'Drop-back bounce', value: 0.3, min: 0, max: 0.6, step: 0.02 },
 
-  // Flight
-  flightYStiffness: { group: 'Flight', label: 'Vertical stiffness', value: 260, min: 60, max: 800, step: 10 },
-  flightYDamping: { group: 'Flight', label: 'Vertical damping', value: 26, min: 5, max: 60, step: 1 },
-  flightXStiffness: { group: 'Flight', label: 'Sideways stiffness', value: 170, min: 60, max: 800, step: 10, hint: 'lower than vertical curves the path' },
-  flightXDamping: { group: 'Flight', label: 'Sideways damping', value: 22, min: 5, max: 60, step: 1 },
-  spinCarry: { group: 'Flight', label: 'Spin carried from hand', value: 1, min: 0, max: 2, step: 0.1 },
-  flightTilt: { group: 'Flight', label: 'Tilt into flight', value: 20, min: 0, max: 60, step: 1 },
-
-  // Landing
-  landDip: { group: 'Landing', label: 'Catch', value: 3, min: 0, max: 10, step: 0.5, hint: 'px the slot gives' },
-  landSquash: { group: 'Landing', label: 'Squash', value: 0.1, min: 0, max: 0.3, step: 0.01 },
-  landRipple: { group: 'Landing', label: 'Ripple', value: 1, min: 0, max: 1, step: 1 },
+  // Deal
+  friction: { group: 'Deal', label: 'Table friction', value: 0.22, min: 0.06, max: 0.4, step: 0.01, hint: 'seconds; higher slides further' },
+  pileScale: { group: 'Deal', label: 'Card size in pile', value: 0.55, min: 0.3, max: 0.9, step: 0.01 },
+  reveal: { group: 'Deal', label: 'Keep showing', value: 0.6, min: 0.1, max: 0.9, step: 0.05, hint: 'least share of each card left uncovered' },
+  scatter: { group: 'Deal', label: 'Scatter', value: 6, min: 0, max: 20, step: 1, hint: 'random turn, degrees' },
+  spinCarry: { group: 'Deal', label: 'Spin from flick', value: 1, min: 0, max: 3, step: 0.1 },
+  toss: { group: 'Deal', label: 'Toss height', value: 0.1, min: 0, max: 0.4, step: 0.01, hint: 'how much it lifts off the table mid-flight' },
 } satisfies Record<string, Omit<Param, 'value'> & { value: number }>
 
 export type TuneKey = keyof typeof defs
@@ -114,7 +109,7 @@ if (typeof window !== 'undefined') {
   query.addEventListener('change', (e) => reducedMotion.set(e.matches ? 1 : 0))
 }
 
-type Flourish = 'lean' | 'tick' | 'swing' | 'pitch' | 'hang' | 'spinCarry' | 'flightTilt' | 'landDip' | 'landSquash' | 'landRipple'
+type Flourish = 'lean' | 'tick' | 'swing' | 'pitch' | 'hang' | 'spinCarry' | 'scatter' | 'toss'
 export const fx = (key: Flourish) => (reducedMotion.get() ? 0 : tune[key].get())
 
 export function changedValues() {
