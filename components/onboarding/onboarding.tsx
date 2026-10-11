@@ -201,7 +201,7 @@ export function Onboarding() {
             >
               <h1 className="text-center text-2xl font-medium text-white">Add your cards</h1>
 
-              <div className="mt-12 flex justify-center" style={{ gap: SLOT_GAP }}>
+              <div className="mt-10 flex justify-center" style={{ gap: SLOT_GAP }}>
                 {Array.from({ length: slotCount }, (_, i) => (
                   <div
                     key={i}
