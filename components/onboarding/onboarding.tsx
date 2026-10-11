@@ -1,6 +1,15 @@
 'use client'
 
-import { AnimatePresence, motion, type Transition } from 'framer-motion'
+import {
+  animate,
+  AnimatePresence,
+  motion,
+  useMotionValue,
+  useSpring,
+  useTransform,
+  useVelocity,
+  type Transition,
+} from 'framer-motion'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { cards, type Benefit, type Card } from '@/lib/cards'
 import { hand, type HandCard } from '@/lib/demo-cards'
@@ -8,6 +17,8 @@ import { AnimatedNumber } from '@/components/animated-number'
 import { HomeView } from '@/components/home-view'
 import { CardFace } from './card-face'
 import { CardFan, CARD_H, CARD_W, type FlickOrigin } from './card-fan'
+import { tune, useTune } from './tune'
+import { TunePanel } from './tune-panel'
 
 type Phase = 'pick' | 'loading' | 'landing' | 'home'
 
@@ -38,8 +49,14 @@ interface Target {
   radius: number
   faceOpacity: number
   opacity: number
-  transition: Transition
+  shadow: number
+  // Whether arriving here is a catch (the slot gives a little).
+  catch: boolean
+  spring: { x: Transition; y: Transition; rest: Transition }
 }
+
+const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v))
+const same = (t: Transition) => ({ x: t, y: t, rest: t })
 
 function useViewport() {
   const [size, setSize] = useState({ w: 402, h: 874 })
@@ -58,6 +75,9 @@ export function Onboarding() {
   const [slotRects, setSlotRects] = useState<DOMRect[]>([])
   const [barRects, setBarRects] = useState<Record<string, DOMRect>>({})
   const [tick, setTick] = useState(0)
+  const [catches, setCatches] = useState<number[]>([])
+  const [tuning] = useState(() => new URLSearchParams(window.location.search).has('tune'))
+  useTune()
   const slotRefs = useRef<(HTMLDivElement | null)[]>([])
   const viewport = useViewport()
 
@@ -122,9 +142,12 @@ export function Onboarding() {
   }, [phase, picked.length])
 
   const targetFor = (index: number, origin: FlickOrigin, at: Phase = phase): Target => {
-    const base = { width: CARD_W, height: CARD_H, radius: 12, faceOpacity: 1, opacity: 1 }
+    const base = { width: CARD_W, height: CARD_H, radius: 12, faceOpacity: 1, opacity: 1, catch: false }
     if (at === 'pick') {
       const slot = slotRects[index]
+      // Vertical and sideways run on different springs, so a thrown card
+      // travels on a curve rather than a straight line.
+      const y: Transition = { type: 'spring', stiffness: tune.flightYStiffness.get(), damping: tune.flightYDamping.get() }
       return {
         ...base,
         x: slot ? slot.left + slot.width / 2 : viewport.w / 2,
@@ -132,12 +155,12 @@ export function Onboarding() {
         scale: slotW / CARD_W,
         rotate: 0,
         radius: 4,
-        transition: {
-          type: 'spring',
-          stiffness: 240,
-          damping: 24,
-          x: { type: 'spring', stiffness: 240, damping: 26, velocity: origin.vx },
-          y: { type: 'spring', stiffness: 240, damping: 24, velocity: origin.vy },
+        shadow: 0.2,
+        catch: true,
+        spring: {
+          x: { type: 'spring', stiffness: tune.flightXStiffness.get(), damping: tune.flightXDamping.get() },
+          y,
+          rest: y,
         },
       }
     }
@@ -151,7 +174,8 @@ export function Onboarding() {
         scale: STACK_SCALE - fromTop * 0.05,
         rotate: (index - (n - 1) / 2) * 4,
         radius: 16,
-        transition: { type: 'spring', stiffness: 200, damping: 24, delay: index * 0.05 },
+        shadow: 0.6,
+        spring: same({ type: 'spring', stiffness: 200, damping: 24, delay: index * 0.05 }),
       }
     }
     const data = picked[index].data
@@ -159,7 +183,7 @@ export function Onboarding() {
     if (!bar) {
       // No benefits to show: sink back into the stack and fade.
       const stack = targetFor(index, origin, 'loading')
-      return { ...stack, scale: stack.scale * 0.85, opacity: 0, transition: { type: 'spring', visualDuration: 0.3, bounce: 0 } }
+      return { ...stack, scale: stack.scale * 0.85, opacity: 0, spring: same({ type: 'spring', visualDuration: 0.3, bounce: 0 }) }
     }
     return {
       x: bar.left + bar.width / 2,
@@ -171,12 +195,14 @@ export function Onboarding() {
       radius: 2,
       faceOpacity: 0,
       opacity: 1,
-      transition: {
+      shadow: 0,
+      catch: false,
+      spring: same({
         type: 'spring',
         stiffness: 210,
         damping: 28,
         delay: (picked.length - 1 - index) * 0.08,
-      },
+      }),
     }
   }
 
@@ -208,9 +234,20 @@ export function Onboarding() {
                     ref={(el) => {
                       slotRefs.current[i] = el
                     }}
-                    className="rounded-[4px] border border-dashed border-neutral-800"
+                    className="relative rounded-[4px] border border-dashed border-neutral-800"
                     style={{ width: slotW, height: slotH }}
-                  />
+                  >
+                    {/* A ring that spreads out as a card is caught. */}
+                    {catches[i] > 0 && tune.landRipple.get() > 0 && (
+                      <motion.div
+                        key={catches[i]}
+                        className="pointer-events-none absolute -inset-px rounded-[4px] border border-white/50"
+                        initial={{ opacity: 1, scale: 1 }}
+                        animate={{ opacity: 0, scale: 1.4 }}
+                        transition={{ duration: 0.5, ease: 'easeOut' }}
+                      />
+                    )}
+                  </div>
                 ))}
               </div>
 
@@ -283,42 +320,145 @@ export function Onboarding() {
       )}
 
       {showOverlay &&
-        picked.map((p, i) => <FlyingCard key={p.card.id} picked={p} target={targetFor(i, p.origin)} shimmer={phase === 'loading'} />)}
+        picked.map((p, i) => (
+          <FlyingCard
+            key={p.card.id}
+            picked={p}
+            target={targetFor(i, p.origin)}
+            shimmer={phase === 'loading'}
+            onCatch={() =>
+              setCatches((prev) => {
+                const next = [...prev]
+                next[i] = (next[i] ?? 0) + 1
+                return next
+              })
+            }
+          />
+        ))}
+
+      {tuning && <TunePanel />}
     </>
   )
 }
 
-function FlyingCard({ picked, target, shimmer }: { picked: Picked; target: Target; shimmer: boolean }) {
+function FlyingCard({
+  picked,
+  target,
+  shimmer,
+  onCatch,
+}: {
+  picked: Picked
+  target: Target
+  shimmer: boolean
+  onCatch: () => void
+}) {
   const { origin, card } = picked
+  // Starts exactly as the card left the hand: same place, turn, tilt, scale
+  // and shadow, moving at the same speed.
+  const x = useMotionValue(origin.x)
+  const y = useMotionValue(origin.y)
+  const spin = useMotionValue(origin.rotate)
+  const pitch = useMotionValue(origin.pitch)
+  const scale = useMotionValue(origin.scale)
+  const width = useMotionValue(CARD_W)
+  const height = useMotionValue(CARD_H)
+  const radius = useMotionValue(12)
+  const opacity = useMotionValue(1)
+  const shadow = useMotionValue(origin.shadow)
+  const catchY = useMotionValue(0)
+  const squash = useMotionValue(0)
+
+  // Leans into its sideways travel, like it's cutting through air.
+  const tilt = useSpring(
+    useTransform(useVelocity(x), (v) => clamp((v * tune.flightTilt.get()) / 1000, -20, 20)),
+    { stiffness: 300, damping: 30 },
+  )
+  const rotate = useTransform(() => spin.get() + tilt.get())
+  const top = useTransform(() => y.get() + catchY.get())
+  const scaleX = useTransform(squash, (s) => 1 + s * 0.6)
+  const scaleY = useTransform(squash, (s) => 1 - s)
+  const shadowY = useTransform(shadow, (l) => l * 24)
+  const shadowScale = useTransform(shadow, (l) => 0.96 + l * 0.06)
+  const shadowOpacity = useTransform(shadow, (l) => 0.55 + l * 0.45)
+  const innerRadius = useTransform(() => radius.get())
+
+  const targetRef = useRef(target)
+  const onCatchRef = useRef(onCatch)
+  useLayoutEffect(() => {
+    targetRef.current = target
+    onCatchRef.current = onCatch
+  })
+  const launched = useRef(false)
+  const key = [target.x, target.y, target.scale, target.rotate, target.width, target.height, target.radius, target.opacity, target.shadow].join()
+
+  useEffect(() => {
+    const t = targetRef.current
+    const first = !launched.current
+    launched.current = true
+    const runs = [
+      animate(x, t.x, first ? { ...t.spring.x, velocity: origin.vx } : t.spring.x),
+      animate(y, t.y, first ? { ...t.spring.y, velocity: origin.vy } : t.spring.y),
+      animate(spin, t.rotate, first ? { ...t.spring.rest, velocity: origin.vr * tune.spinCarry.get() } : t.spring.rest),
+      animate(pitch, 0, t.spring.rest),
+      animate(scale, t.scale, t.spring.rest),
+      animate(width, t.width, t.spring.rest),
+      animate(height, t.height, t.spring.rest),
+      animate(radius, t.radius / t.scale, t.spring.rest),
+      animate(opacity, t.opacity, t.spring.rest),
+      animate(shadow, t.shadow, t.spring.rest),
+    ]
+    // The first moment it reaches the slot, the slot gives a little and the
+    // card squashes against it.
+    let caught = !t.catch
+    const check = () => {
+      if (caught || Math.hypot(x.get() - t.x, y.get() - t.y) > 2) return
+      caught = true
+      const dip = tune.landDip.get()
+      if (dip) animate(catchY, 0, { type: 'spring', velocity: -dip * 36, stiffness: 500, damping: 18 })
+      const amount = tune.landSquash.get()
+      if (amount) animate(squash, 0, { type: 'spring', velocity: amount * 40, stiffness: 600, damping: 20 })
+      onCatchRef.current()
+    }
+    const unsubscribe = [x.on('change', check), y.on('change', check)]
+    return () => {
+      runs.forEach((r) => r.stop())
+      unsubscribe.forEach((u) => u())
+    }
+  }, [key, origin, x, y, spin, pitch, scale, width, height, radius, opacity, shadow, catchY, squash])
+
   return (
-    <motion.div
-      className="pointer-events-none fixed left-0 top-0 z-50"
-      initial={{ x: origin.x, y: origin.y }}
-      animate={{ x: target.x, y: target.y, opacity: target.opacity }}
-      transition={target.transition}
-    >
+    <motion.div className="pointer-events-none fixed left-0 top-0 z-50" style={{ x, y: top, opacity }}>
       <motion.div
-        className="absolute left-0 top-0 overflow-hidden bg-white shadow-[0_10px_30px_-8px_rgba(0,0,0,0.8)]"
-        style={{ x: '-50%', y: '-50%' }}
-        initial={{ width: CARD_W, height: CARD_H, scale: origin.scale, rotate: origin.rotate, borderRadius: 12 }}
-        animate={{
-          width: target.width,
-          height: target.height,
-          scale: target.scale,
-          rotate: target.rotate,
-          borderRadius: target.radius / target.scale,
+        className="absolute left-0 top-0"
+        style={{
+          x: '-50%',
+          y: '-50%',
+          width,
+          height,
+          scale,
+          scaleX,
+          scaleY,
+          rotate,
+          rotateX: pitch,
+          transformPerspective: 900,
         }}
-        transition={target.transition}
       >
         <motion.div
-          className="absolute left-1/2 top-1/2"
-          style={{ width: CARD_W, height: CARD_H, x: '-50%', y: '-50%' }}
-          animate={{ opacity: target.faceOpacity }}
-          // While landing, the card keeps its colour until it has mostly shrunk into the bar.
-          transition={target.faceOpacity === 0 ? { duration: 0.3, delay: 0.18, ease: 'easeIn' } : { duration: 0.25 }}
-        >
-          <CardFace card={card} />
-          {shimmer && <div className="animate-shimmer absolute inset-0" />}
+          aria-hidden
+          className="absolute inset-0 shadow-[0_32px_48px_-12px_rgba(0,0,0,0.9)] will-change-transform"
+          style={{ borderRadius: innerRadius, y: shadowY, scale: shadowScale, opacity: shadowOpacity }}
+        />
+        <motion.div className="absolute inset-0 overflow-hidden bg-white" style={{ borderRadius: innerRadius }}>
+          <motion.div
+            className="absolute left-1/2 top-1/2"
+            style={{ width: CARD_W, height: CARD_H, x: '-50%', y: '-50%' }}
+            animate={{ opacity: target.faceOpacity }}
+            // While landing, the card keeps its colour until it has mostly shrunk into the bar.
+            transition={target.faceOpacity === 0 ? { duration: 0.3, delay: 0.18, ease: 'easeIn' } : { duration: 0.25 }}
+          >
+            <CardFace card={card} />
+            {shimmer && <div className="animate-shimmer absolute inset-0" />}
+          </motion.div>
         </motion.div>
       </motion.div>
     </motion.div>
