@@ -33,9 +33,11 @@ interface HomeViewProps {
   // Set by the onboarding demo: 'hidden' lays the screen out invisibly so the
   // flying cards can measure where their glow bars sit, 'revealed' fades it in.
   intro?: 'hidden' | 'revealed'
+  // The yearly value the onboarding found, shown under the total.
+  found?: number
 }
 
-export function HomeView({ cards, intro }: HomeViewProps) {
+export function HomeView({ cards, intro, found }: HomeViewProps) {
   const [usageState, setUsageState] = useState<UsageState>({})
   const [mounted, setMounted] = useState(false)
   const [celebrating, setCelebrating] = useState(false)
@@ -78,10 +80,25 @@ export function HomeView({ cards, intro }: HomeViewProps) {
   return (
     <main className="min-h-screen bg-neutral-950 px-4 py-8">
       <div className="max-w-md mx-auto">
-        <header className={`mb-12 ${hidden ? 'opacity-0' : 'animate-fade-in'}`}>
-          <p className={`text-2xl font-medium text-white ${celebrating ? 'animate-celebrate' : ''}`}>
+        {/* Only the onboarding reveals the screen; ordinary opens show it at once. */}
+        <header className="mb-12">
+          <p
+            className={`text-2xl font-medium text-white ${hidden ? 'opacity-0' : intro ? 'reveal-total' : ''} ${celebrating ? 'animate-celebrate' : ''}`}
+          >
             {hidden ? '$0' : <AnimatedNumber value={claimedValue} animateOnMount />} / ${totalAnnualFees.toLocaleString()}
           </p>
+          {found !== undefined && (
+            <p className="mt-1 text-sm text-neutral-400">
+              {/* The onboarding's loading total flies into this spot, so it
+                  shows straight away rather than fading in. */}
+              <span data-found-value className={hidden ? 'opacity-0' : ''}>
+                ${Math.round(found).toLocaleString()}
+              </span>{' '}
+              <span className={hidden ? 'opacity-0' : 'reveal-fade'} style={{ animationDelay: '60ms' }}>
+                in benefits a year
+              </span>
+            </p>
+          )}
         </header>
 
         {cards.map((card, index) => (

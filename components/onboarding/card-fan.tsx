@@ -14,7 +14,7 @@ import {
 import { useCallback, useEffect, useRef } from 'react'
 import type { HandCard } from '@/lib/demo-cards'
 import { CardFace } from './card-face'
-import { tune, useTune } from './tune'
+import { fx, reducedMotion, tune, useTune } from './tune'
 
 export const CARD_W = 152
 export const CARD_H = 240
@@ -62,6 +62,9 @@ interface CardFanProps {
   items: HandCard[]
   // Return false to reject the card; it bounces back into the hand.
   onFlick: (card: HandCard, origin: FlickOrigin) => boolean
+  // Bump to have the whole hand settle with a small dip, once the cards that
+  // matter are all in.
+  exhale?: number
 }
 
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v))
@@ -119,7 +122,7 @@ function nearestAddable(items: HandCard[], from: number) {
   return best
 }
 
-export function CardFan({ items, onFlick }: CardFanProps) {
+export function CardFan({ items, onFlick, exhale = 0 }: CardFanProps) {
   useTune()
   const offset = useMotionValue(Math.floor((items.length - 1) / 2))
   const handles = useRef(new Map<string, CardHandle>())
@@ -130,6 +133,7 @@ export function CardFan({ items, onFlick }: CardFanProps) {
   const hold = useMotionValue(0)
   // A short pop on the centre card each time a new card passes through it.
   const tick = useMotionValue(0)
+  const breath = useMotionValue(0)
   const gesture = useRef<{
     id: number
     x: number
@@ -144,7 +148,7 @@ export function CardFan({ items, onFlick }: CardFanProps) {
   // The whole hand leans into fast swipes and settles back upright.
   const offsetVelocity = useVelocity(offset)
   const lean = useSpring(
-    useTransform(() => clamp(-offsetVelocity.get() * tune.lean.get(), -7, 7)),
+    useTransform(() => clamp(-offsetVelocity.get() * fx('lean'), -7, 7)),
     { stiffness: 300, damping: 30 },
   )
 
@@ -154,10 +158,14 @@ export function CardFan({ items, onFlick }: CardFanProps) {
       const now = Math.round(v)
       if (now === last) return
       last = now
-      const strength = tune.tick.get()
+      const strength = fx('tick')
       if (strength > 0) animate(tick, 0, { type: 'spring', velocity: strength * 40, stiffness: 700, damping: 24 })
     })
   }, [offset, tick])
+
+  useEffect(() => {
+    if (exhale && !reducedMotion.get()) animate(breath, 0, { type: 'spring', velocity: 60, stiffness: 200, damping: 18 })
+  }, [exhale, breath])
 
   // Keep the focused card in focus as the hand changes. When the focused card
   // was flicked away, its neighbour slides into the gap instead.
@@ -307,6 +315,7 @@ export function CardFan({ items, onFlick }: CardFanProps) {
       if (index !== Math.round(offset.get())) {
         animate(offset, index, settle)
       } else {
+        if (reducedMotion.get()) return
         animate(h.dragY, -36, { type: 'spring', visualDuration: 0.16, bounce: 0 }).then(() =>
           animate(h.dragY, 0, { type: 'spring', visualDuration: 0.4, bounce: 0.45 }),
         )
@@ -342,7 +351,8 @@ export function CardFan({ items, onFlick }: CardFanProps) {
       if (accepted) return
       flicked.current.delete(card.id)
       // Not in the demo data: it refuses to leave and drops back into the hand.
-      animate(h.dragX, [h.dragX.get(), -14, 11, -6, 3, 0], { duration: 0.5, ease: 'easeOut' })
+      if (reducedMotion.get()) animate(h.dragX, 0, snapBack())
+      else animate(h.dragX, [h.dragX.get(), -14, 11, -6, 3, 0], { duration: 0.5, ease: 'easeOut' })
       animate(h.dragY, 0, { ...snapBack(), velocity: vy })
     } else {
       animate(h.dragX, 0, { ...snapBack(), velocity: vx })
@@ -397,6 +407,7 @@ export function CardFan({ items, onFlick }: CardFanProps) {
             lean={lean}
             hold={hold}
             tick={tick}
+            breath={breath}
             register={register}
           />
         ))}
@@ -412,10 +423,11 @@ interface FanCardProps {
   lean: MotionValue<number>
   hold: MotionValue<number>
   tick: MotionValue<number>
+  breath: MotionValue<number>
   register: (id: string, handle: CardHandle | null) => void
 }
 
-function FanCard({ card, index, offset, lean, hold, tick, register }: FanCardProps) {
+function FanCard({ card, index, offset, lean, hold, tick, breath, register }: FanCardProps) {
   const ref = useRef<HTMLDivElement>(null)
   const slot = useSpring(index, { stiffness: 520, damping: 44 })
   const indexRef = useRef(index)
@@ -445,16 +457,16 @@ function FanCard({ card, index, offset, lean, hold, tick, register }: FanCardPro
   useTune()
   // A held card tips in the direction it's moving.
   const swing = useSpring(
-    useTransform(useVelocity(dragX), (v) => clamp((v * tune.swing.get()) / 1000, -16, 16)),
+    useTransform(useVelocity(dragX), (v) => clamp((v * fx('swing')) / 1000, -16, 16)),
     { stiffness: tune.swingStiffness.get(), damping: tune.swingDamping.get() },
   )
   const pitch = useSpring(
-    useTransform(useVelocity(dragY), (v) => clamp((-v * tune.pitch.get()) / 1000, -14, 14)),
+    useTransform(useVelocity(dragY), (v) => clamp((-v * fx('pitch')) / 1000, -14, 14)),
     { stiffness: 400, damping: 24 },
   )
   // Held off-centre, the card hangs a little from the grab point.
   const hang = useTransform(
-    () => ((tune.hang.get() * Math.atan2(-pinX.get(), Math.abs(pinY.get()) + 40) * 180) / Math.PI) * lifted.get(),
+    () => ((fx('hang') * Math.atan2(-pinX.get(), Math.abs(pinY.get()) + 40) * 180) / Math.PI) * lifted.get(),
   )
 
   const angle = useTransform(() => angleFor(d.get()))
@@ -480,12 +492,18 @@ function FanCard({ card, index, offset, lean, hold, tick, register }: FanCardPro
     () =>
       tune.radius.get() * (1 - Math.cos(angle.get())) -
       (tune.lift.get() + tick.get()) * focus.get() +
+      breath.get() +
       dragY.get() +
       pinOffset('y'),
   )
   const zIndex = useTransform(() => (dragY.get() < -2 ? 300 : 100 - Math.round(Math.abs(d.get()) * 10)))
   const shade = useTransform(d, (v) => Math.min(0.55, Math.abs(v) * 0.14))
   const fade = useTransform(d, (v) => clamp(6 - Math.abs(v), 0, 1))
+  // Cards past the screen edge drop out of rendering, so the hand only keeps
+  // GPU layers for the cards you can see.
+  const display = useTransform(() =>
+    fade.get() > 0 && Math.abs(x.get()) < window.innerWidth / 2 + CARD_H * 0.7 ? 'block' : 'none',
+  )
   // The shadow is a pre-blurred layer that only moves and fades, which the GPU
   // can do without repainting.
   const shadowLevel = useTransform(() => Math.max(focus.get() * 0.4, lifted.get()))
@@ -535,6 +553,7 @@ function FanCard({ card, index, offset, lean, hold, tick, register }: FanCardPro
         scale,
         zIndex,
         opacity: fade,
+        display,
       }}
     >
       <motion.div

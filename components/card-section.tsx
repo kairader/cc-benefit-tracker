@@ -26,15 +26,19 @@ export function CardSection({ card, usageState, onToggleBenefit, index = 0, cele
   })
 
   // During the onboarding intro the glow bar is where the flying card lands,
-  // so it stays put while the name and benefits fade in around it.
-  const delay = { animationDelay: `${100 + index * 75}ms` }
-  const contentClass = intro === 'hidden' ? 'opacity-0' : intro ? 'animate-stagger' : ''
+  // so it stays put while the name rises in and the benefits fade in after it.
+  // Ordinary opens skip the reveal.
+  const nameAt = 120 + index * 60
+  const reveal = (className: string, delay: number) =>
+    intro === 'hidden'
+      ? { className: 'opacity-0' }
+      : intro
+        ? { className, style: { animationDelay: `${delay}ms` } }
+        : {}
+  const name = reveal('reveal-name', nameAt)
 
   return (
-    <section
-      className={`mb-8 ${intro ? '' : 'animate-stagger'}`}
-      style={intro ? undefined : delay}
-    >
+    <section className="mb-8">
       <div className="flex items-center py-2 mb-2">
         <div
           data-glow-bar={card.id}
@@ -48,16 +52,17 @@ export function CardSection({ card, usageState, onToggleBenefit, index = 0, cele
             `
           }}
         />
-        <h2 className={`text-base font-medium pl-2 ${contentClass}`} style={{ color: card.textColor, ...(intro ? delay : {}) }}>{card.name}</h2>
+        <h2 className={`text-base font-medium pl-2 ${name.className ?? ''}`} style={{ color: card.textColor, ...name.style }}>{card.name}</h2>
       </div>
-      <div className={contentClass} style={intro ? { animationDelay: `${180 + index * 75}ms` } : undefined}>
-        {sortedBenefits.map((benefit) => {
+      <div className={intro === 'hidden' ? 'opacity-0' : ''}>
+        {sortedBenefits.map((benefit, row) => {
           const period = getCurrentPeriod(benefit.cycle)
           const isUsed = isBenefitUsed(benefit.id, period, usageState)
 
           return (
             <motion.div
               key={benefit.id}
+              {...(intro === 'revealed' ? reveal('reveal-fade', nameAt + 40 + row * 30) : {})}
               layout
               initial={false}
               animate={{ opacity: 1 }}

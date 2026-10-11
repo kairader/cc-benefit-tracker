@@ -105,6 +105,18 @@ export function useTune() {
   )
 }
 
+// 1 when the system asks for reduced motion. Flourishes read through fx(),
+// so they drop to zero there while gestures that follow the finger stay.
+export const reducedMotion = motionValue(0)
+if (typeof window !== 'undefined') {
+  const query = window.matchMedia('(prefers-reduced-motion: reduce)')
+  reducedMotion.set(query.matches ? 1 : 0)
+  query.addEventListener('change', (e) => reducedMotion.set(e.matches ? 1 : 0))
+}
+
+type Flourish = 'lean' | 'tick' | 'swing' | 'pitch' | 'hang' | 'spinCarry' | 'flightTilt' | 'landDip' | 'landSquash' | 'landRipple'
+export const fx = (key: Flourish) => (reducedMotion.get() ? 0 : tune[key].get())
+
 export function changedValues() {
   const out: Partial<Record<TuneKey, number>> = {}
   for (const key of Object.keys(params) as TuneKey[]) {
