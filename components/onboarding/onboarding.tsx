@@ -78,8 +78,6 @@ export function Onboarding() {
   const [barRects, setBarRects] = useState<Record<string, DOMRect>>({})
   const [tick, setTick] = useState(0)
   const [exhale, setExhale] = useState(0)
-  // Hue of the card at the front of the hand; the landing spot glows with it.
-  const [focusHue, setFocusHue] = useState(240)
   // Where the loading total flies to: its place in the home header.
   const [counterTo, setCounterTo] = useState<{ x: number; y: number; scale: number } | null>(null)
   const counterRef = useRef<HTMLSpanElement>(null)
@@ -247,9 +245,9 @@ export function Onboarding() {
           animate={{ backgroundColor: phase === 'landing' ? 'rgba(10,10,10,0)' : 'rgba(10,10,10,1)' }}
           transition={{ duration: 0.4 }}
         >
-          {/* Where the next card will land: a card-shaped outline lit like the
-              home screen's glow bars, in the colour of the card at the front
-              of the hand. It slides on once the card heading for it arrives. */}
+          {/* Where the next card will land: a card-shaped outline with a soft
+              neutral glow, like the home screen's glow bars. It slides on
+              once the card heading for it arrives. */}
           <motion.div
             aria-hidden
             className="pointer-events-none absolute left-0 top-0"
@@ -264,12 +262,8 @@ export function Onboarding() {
             }}
           >
             <div
-              className="animate-breathe -translate-x-1/2 -translate-y-1/2 rounded-[5px] border border-white/40 transition-[box-shadow] duration-300"
-              style={{
-                width: CARD_W * pileScale,
-                height: CARD_H * pileScale,
-                boxShadow: `0 0 6px 1px oklch(75% 0.12 ${focusHue} / 0.5), 0 0 20px 4px oklch(75% 0.12 ${focusHue} / 0.25), inset 0 0 12px oklch(75% 0.12 ${focusHue} / 0.2)`,
-              }}
+              className="animate-breathe -translate-x-1/2 -translate-y-1/2 rounded-[5px] border border-white/40 shadow-[0_0_6px_1px_rgb(255_255_255/0.3),0_0_20px_4px_rgb(255_255_255/0.12),inset_0_0_12px_rgb(255_255_255/0.1)]"
+              style={{ width: CARD_W * pileScale, height: CARD_H * pileScale }}
             />
           </motion.div>
 
@@ -283,7 +277,7 @@ export function Onboarding() {
               animate={phase === 'pick' ? { opacity: 1, filter: 'blur(0px)' } : { opacity: 0, filter: 'blur(2px)' }}
               transition={phase === 'pick' ? { duration: 0.4, ease: 'easeOut' } : { duration: 0.2, ease: EASE_OUT }}
             >
-              <h1 className="text-base font-medium text-white">Flick to add your cards</h1>
+              <h1 className="text-base font-medium text-white">Add your cards</h1>
             </motion.header>
 
             <motion.div
@@ -291,7 +285,7 @@ export function Onboarding() {
               animate={phase === 'pick' ? { y: 0, opacity: 1 } : { y: 160, opacity: 0 }}
               transition={phase === 'pick' ? { duration: 0 } : { type: 'spring', visualDuration: 0.3, bounce: 0 }}
             >
-              <CardFan items={items} onFlick={handleFlick} exhale={exhale} onFocus={(c) => setFocusHue(c.hue)} />
+              <CardFan items={items} onFlick={handleFlick} exhale={exhale} />
             </motion.div>
 
             {/* Solid dark backing at the screen edge: Safari tints its toolbar from

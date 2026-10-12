@@ -65,8 +65,6 @@ interface CardFanProps {
   // Bump to have the whole hand settle with a small dip, once the cards that
   // matter are all in.
   exhale?: number
-  // Told whenever a different card comes to the front.
-  onFocus?: (card: HandCard) => void
 }
 
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v))
@@ -124,7 +122,7 @@ function nearestAddable(items: HandCard[], from: number) {
   return best
 }
 
-export function CardFan({ items, onFlick, exhale = 0, onFocus }: CardFanProps) {
+export function CardFan({ items, onFlick, exhale = 0 }: CardFanProps) {
   useTune()
   const offset = useMotionValue(Math.floor((items.length - 1) / 2))
   const handles = useRef(new Map<string, CardHandle>())
@@ -166,23 +164,9 @@ export function CardFan({ items, onFlick, exhale = 0, onFocus }: CardFanProps) {
   }, [offset, tick])
 
   const itemsRef = useRef(items)
-  const onFocusRef = useRef(onFocus)
   useLayoutEffect(() => {
     itemsRef.current = items
-    onFocusRef.current = onFocus
   })
-  useEffect(() => {
-    let last: string | undefined
-    const report = () => {
-      const card = itemsRef.current[clamp(Math.round(offset.get()), 0, itemsRef.current.length - 1)]
-      if (!card || card.id === last) return
-      last = card.id
-      onFocusRef.current?.(card)
-    }
-    report()
-    const unsubscribe = offset.on('change', report)
-    return () => unsubscribe()
-  }, [offset, items])
 
   // A hint on arrival: the front card hops up and drops back, showing that
   // cards lift out of the hand. Skipped once the hand has been touched.
