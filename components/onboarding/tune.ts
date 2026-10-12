@@ -25,8 +25,8 @@ const defs = {
   lean: { group: 'Swipe', label: 'Hand lean', value: 1.6, min: 0, max: 4, step: 0.1 },
 
   // Hand
-  radius: { group: 'Hand', label: 'Arc radius', value: 760, min: 400, max: 1400, step: 10 },
-  step: { group: 'Hand', label: 'Card spacing', value: 6.2, min: 3, max: 10, step: 0.1, hint: 'degrees' },
+  radius: { group: 'Hand', label: 'Arc radius', value: 720, min: 400, max: 1400, step: 10 },
+  step: { group: 'Hand', label: 'Card spacing', value: 8.4, min: 3, max: 10, step: 0.1, hint: 'degrees' },
   spread: { group: 'Hand', label: 'Gap around centre card', value: 3.4, min: 0, max: 8, step: 0.1, hint: 'degrees' },
   lift: { group: 'Hand', label: 'Centre card lift', value: 16, min: 0, max: 40, step: 1 },
   close: { group: 'Hand', label: 'Close gap while holding', value: 0.5, min: 0, max: 1, step: 0.05 },
@@ -52,7 +52,7 @@ const defs = {
   overshoot: { group: 'Deal', label: 'Landing overshoot', value: 1.3, min: 1, max: 1.8, step: 0.05, hint: '1 lands dead; higher sails past and settles back' },
   pileScale: { group: 'Deal', label: 'Card size in spread', value: 0.44, min: 0.25, max: 0.7, step: 0.01 },
   spacing: { group: 'Deal', label: 'Card spacing', value: 52, min: 24, max: 90, step: 1 },
-  rowStep: { group: 'Deal', label: 'Row spacing', value: 60, min: 30, max: 120, step: 2 },
+  rowStep: { group: 'Deal', label: 'Row spacing', value: 40, min: 30, max: 120, step: 2 },
   perRow: { group: 'Deal', label: 'Cards per row', value: 5, min: 2, max: 6, step: 1 },
   scatter: { group: 'Deal', label: 'Scatter', value: 4, min: 0, max: 12, step: 0.5, hint: 'turns and nudges, degrees' },
   toss: { group: 'Deal', label: 'Toss height', value: 0.1, min: 0, max: 0.4, step: 0.01, hint: 'how much it lifts off the table mid-flight' },

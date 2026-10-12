@@ -29,8 +29,8 @@ interface Picked {
   origin: FlickOrigin
 }
 
-// Makes the front card 280 tall, so the stack's edges land on the 4px grid.
-const STACK_SCALE = 280 / CARD_H
+// Makes the front card 320 wide, so the stack's edges land on the 4px grid.
+const STACK_SCALE = 320 / CARD_W
 const LOADING_MS = 1700
 // Height from the screen's bottom edge to the top of the raised centre card
 // (the hand is anchored 248 up).

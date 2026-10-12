@@ -16,8 +16,8 @@ import type { HandCard } from '@/lib/demo-cards'
 import { CardFace } from './card-face'
 import { fx, reducedMotion, tune, useTune } from './tune'
 
-export const CARD_W = 144
-export const CARD_H = 228
+export const CARD_W = 208
+export const CARD_H = 132
 
 // Cards sit on an arc around a pivot well below the screen, like a hand of
 // cards. Radius, spacing, the gap around the centre card and the lift all
@@ -526,7 +526,7 @@ function FanCard({ card, index, offset, lean, hold, tick, breath, register }: Fa
   // Cards past the screen edge drop out of rendering, so the hand only keeps
   // GPU layers for the cards you can see.
   const display = useTransform(() =>
-    fade.get() > 0 && Math.abs(x.get()) < window.innerWidth / 2 + CARD_H * 0.7 ? 'block' : 'none',
+    fade.get() > 0 && Math.abs(x.get()) < window.innerWidth / 2 + CARD_W * 0.7 ? 'block' : 'none',
   )
   // The shadow is a pre-blurred layer that only moves and fades, which the GPU
   // can do without repainting.

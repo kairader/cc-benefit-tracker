@@ -4,7 +4,7 @@ export interface HandCard {
   id: string
   name: string
   issuer: string
-  // Portrait art in public/cards, rotated so the card reads top to bottom.
+  // Card art in public/cards, sized to the hand card at 3x.
   image: string
   cardId?: string
 }
