@@ -19,7 +19,8 @@ interface Param {
 
 const defs = {
   // Swipe
-  fingerLock: { group: 'Swipe', label: 'Card stays under finger', value: 1, min: 0, max: 1, step: 1 },
+  fingerLock: { group: 'Swipe', label: 'Card stays under finger', value: 0, min: 0, max: 1, step: 1, hint: 'on a tight fan this makes each card a short swipe' },
+  swipeDistance: { group: 'Swipe', label: 'Swipe per card', value: 96, min: 40, max: 200, step: 4, hint: 'px of drag to move one card' },
   coast: { group: 'Swipe', label: 'Coast', value: 0.25, min: 0.05, max: 0.8, step: 0.01, hint: 'how far a fling carries, in seconds of travel' },
   tick: { group: 'Swipe', label: 'Detent tick', value: 4, min: 0, max: 12, step: 0.5, hint: 'px pop as each card passes the centre' },
   lean: { group: 'Swipe', label: 'Hand lean', value: 1.6, min: 0, max: 4, step: 0.1 },
@@ -56,7 +57,7 @@ const defs = {
   perRow: { group: 'Deal', label: 'Cards per row', value: 5, min: 2, max: 6, step: 1 },
   scatter: { group: 'Deal', label: 'Scatter', value: 4, min: 0, max: 12, step: 0.5, hint: 'turns and nudges, degrees' },
   toss: { group: 'Deal', label: 'Toss height', value: 0.1, min: 0, max: 0.4, step: 0.01, hint: 'how much it lifts off the table mid-flight' },
-  handGap: { group: 'Deal', label: 'Gap above hand', value: 168, min: 16, max: 320, step: 4 },
+  titleGap: { group: 'Deal', label: 'Gap below title', value: 32, min: 8, max: 160, step: 4 },
 } satisfies Record<string, Omit<Param, 'value'> & { value: number }>
 
 export type TuneKey = keyof typeof defs

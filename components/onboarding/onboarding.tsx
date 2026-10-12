@@ -32,9 +32,6 @@ interface Picked {
 // Makes the front card 320 wide, so the stack's edges land on the 4px grid.
 const STACK_SCALE = 320 / CARD_W
 const LOADING_MS = 1700
-// Height from the screen's bottom edge to the top of the raised centre card
-// (the hand is anchored 248 up).
-const HAND_TOP = 248 + CARD_H / 2 + 16
 
 const EASE_OUT = [0.22, 1, 0.36, 1] as const
 const DATA_IDS = hand.filter((c) => c.cardId).map((c) => c.id)
@@ -152,14 +149,13 @@ export function Onboarding() {
     return () => clearTimeout(timer)
   }, [phase, picked.length])
 
-  // The table is the space between the nav bar and the hand, less a gap
-  // that keeps the spread clear of the cards still in the hand.
+  // The table starts a set gap under the nav bar and grows down toward the hand.
   const pileScale = tune.pileScale.get()
   const spotFor = (index: number, count: number) =>
     spreadSpot(
       index,
       count,
-      { top: navBottom + 32, bottom: viewport.h - HAND_TOP - tune.handGap.get(), centerX: viewport.w / 2 },
+      { top: navBottom + tune.titleGap.get(), centerX: viewport.w / 2 },
       {
         cardH: CARD_H * pileScale,
         step: tune.spacing.get(),

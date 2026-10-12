@@ -287,8 +287,7 @@ export function CardFan({ items, onFlick, exhale = 0 }: CardFanProps) {
         const d = dFor(xFor(d0) + dx)
         offset.set(rubberBand(g.lockIndex - d, max))
       } else {
-        const spacing = tune.radius.get() * rad(tune.step.get())
-        offset.set(rubberBand(g.startOffset - dx / spacing, max))
+        offset.set(rubberBand(g.startOffset - dx / tune.swipeDistance.get(), max))
       }
     } else {
       const h = g.cardId ? handles.current.get(g.cardId) : null
@@ -390,7 +389,7 @@ export function CardFan({ items, onFlick, exhale = 0 }: CardFanProps) {
   const coast = (vx: number, lockIndex: number) => {
     const max = items.length - 1
     const from = offset.get()
-    const slope = tune.fingerLock.get() ? slopeAt(lockIndex - from) : tune.radius.get() * rad(tune.step.get())
+    const slope = tune.fingerLock.get() ? slopeAt(lockIndex - from) : tune.swipeDistance.get()
     const v = -vx / slope // cards per second
     if (from < 0 || from > max) {
       animate(offset, clamp(Math.round(from), 0, max), { ...settle, velocity: v })
