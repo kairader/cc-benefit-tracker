@@ -59,7 +59,6 @@ interface Target {
   spring: { x: Transition; y: Transition; rest: Transition }
 }
 
-const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v))
 const same = (t: Transition) => ({ x: t, y: t, rest: t })
 
 function useViewport() {
@@ -79,6 +78,8 @@ export function Onboarding() {
   const [barRects, setBarRects] = useState<Record<string, DOMRect>>({})
   const [tick, setTick] = useState(0)
   const [exhale, setExhale] = useState(0)
+  // Hue of the card at the front of the hand; the landing spot glows with it.
+  const [focusHue, setFocusHue] = useState(240)
   // Where the loading total flies to: its place in the home header.
   const [counterTo, setCounterTo] = useState<{ x: number; y: number; scale: number } | null>(null)
   const counterRef = useRef<HTMLSpanElement>(null)
@@ -154,24 +155,28 @@ export function Onboarding() {
     return () => clearTimeout(timer)
   }, [phase, picked.length])
 
+  // The table is the space between the nav bar and the hand, less a gap
+  // that keeps the spread clear of the cards still in the hand.
+  const pileScale = tune.pileScale.get()
+  const spotFor = (index: number, count: number) =>
+    spreadSpot(
+      index,
+      count,
+      { top: navBottom + 24, bottom: viewport.h - HAND_TOP - tune.handGap.get(), centerX: viewport.w / 2 },
+      {
+        cardH: CARD_H * pileScale,
+        step: tune.spacing.get(),
+        rowStep: tune.rowStep.get(),
+        perRow: tune.perRow.get(),
+        scatter: fx('scatter'),
+      },
+    )
+  const nextSpot = spotFor(picked.length, picked.length + 1)
+
   const targetFor = (index: number, origin: FlickOrigin, at: Phase = phase): Target => {
     const base = { width: CARD_W, height: CARD_H, radius: 12, faceOpacity: 1, opacity: 1, deal: false }
     if (at === 'pick') {
-      // The table is the space between the nav bar and the hand, less a gap
-      // that keeps the spread clear of the cards still in the hand.
-      const pileScale = tune.pileScale.get()
-      const spot = spreadSpot(
-        index,
-        picked.length,
-        { top: navBottom + 24, bottom: viewport.h - HAND_TOP - tune.handGap.get(), centerX: viewport.w / 2 },
-        {
-          cardH: CARD_H * pileScale,
-          step: tune.spacing.get(),
-          rowStep: tune.rowStep.get(),
-          perRow: tune.perRow.get(),
-          scatter: fx('scatter'),
-        },
-      )
+      const spot = spotFor(index, picked.length)
       return {
         ...base,
         ...spot,
@@ -242,6 +247,32 @@ export function Onboarding() {
           animate={{ backgroundColor: phase === 'landing' ? 'rgba(10,10,10,0)' : 'rgba(10,10,10,1)' }}
           transition={{ duration: 0.4 }}
         >
+          {/* Where the next card will land: a card-shaped outline lit like the
+              home screen's glow bars, in the colour of the card at the front
+              of the hand. It slides on once the card heading for it arrives. */}
+          <motion.div
+            aria-hidden
+            className="pointer-events-none absolute left-0 top-0"
+            initial={false}
+            animate={{ x: nextSpot.x, y: nextSpot.y, rotate: nextSpot.rotate, opacity: phase === 'pick' ? 1 : 0 }}
+            transition={{
+              type: 'spring',
+              visualDuration: 0.4,
+              bounce: 0,
+              delay: picked.length ? tune.flightDuration.get() * 0.6 : 0,
+              opacity: { duration: 0.2 },
+            }}
+          >
+            <div
+              className="animate-breathe -translate-x-1/2 -translate-y-1/2 rounded-[5px] border border-white/40 transition-[box-shadow] duration-300"
+              style={{
+                width: CARD_W * pileScale,
+                height: CARD_H * pileScale,
+                boxShadow: `0 0 6px 1px oklch(75% 0.12 ${focusHue} / 0.5), 0 0 20px 4px oklch(75% 0.12 ${focusHue} / 0.25), inset 0 0 12px oklch(75% 0.12 ${focusHue} / 0.2)`,
+              }}
+            />
+          </motion.div>
+
           <div className="mx-auto flex h-full max-w-md flex-col px-4 pt-[env(safe-area-inset-top)]">
             {/* The title sits where an iOS nav bar would. Leaving is quieter
                 than arriving: a quick fade, no movement. */}
@@ -252,7 +283,7 @@ export function Onboarding() {
               animate={phase === 'pick' ? { opacity: 1, filter: 'blur(0px)' } : { opacity: 0, filter: 'blur(2px)' }}
               transition={phase === 'pick' ? { duration: 0.4, ease: 'easeOut' } : { duration: 0.2, ease: EASE_OUT }}
             >
-              <h1 className="text-[17px] font-medium text-white">Add your cards</h1>
+              <h1 className="text-base font-medium text-white">Flick to add your cards</h1>
             </motion.header>
 
             <motion.div
@@ -260,7 +291,7 @@ export function Onboarding() {
               animate={phase === 'pick' ? { y: 0, opacity: 1 } : { y: 160, opacity: 0 }}
               transition={phase === 'pick' ? { duration: 0 } : { type: 'spring', visualDuration: 0.3, bounce: 0 }}
             >
-              <CardFan items={items} onFlick={handleFlick} exhale={exhale} />
+              <CardFan items={items} onFlick={handleFlick} exhale={exhale} onFocus={(c) => setFocusHue(c.hue)} />
             </motion.div>
 
             {/* Solid dark backing at the screen edge: Safari tints its toolbar from
@@ -396,13 +427,15 @@ function FlyingCard({ picked, target, onLand }: { picked: Picked; target: Target
     targetRef.current = target
     onLandRef.current = onLand
   })
-  const launched = useRef(false)
+  // The target it was first sent to. An effect re-run for that same target
+  // (React's dev double-run) restarts the launch rather than skipping it.
+  const firstKey = useRef<string | null>(null)
   const key = [target.x, target.y, target.scale, target.rotate, target.width, target.height, target.radius, target.opacity, target.shadow].join()
 
   useEffect(() => {
     const t = targetRef.current
-    const first = !launched.current
-    launched.current = true
+    firstKey.current ??= key
+    const first = firstKey.current === key
 
     if (t.tint) {
       tint.jump(1)
@@ -432,39 +465,26 @@ function FlyingCard({ picked, target, onLand }: { picked: Picked; target: Target
     }
 
     if (first && t.deal) {
-      // Dealt onto the table. Every card makes the same trip whatever the
-      // flick: it rises out of the hand fast and eases to a stop on a fixed
-      // time constant, shrinking a little ahead of its travel so it reads as
-      // dropping away onto the table. A sideways flick bends the path a
-      // little rather than steering it.
-      const tau = tune.flightTime.get()
-      const glide = (mv: typeof x, to: number, k = 1, restDelta = 0.01) =>
-        animate(mv, to, {
-          type: 'inertia',
-          velocity: (to - mv.get()) / (tau * k),
-          power: 1,
-          timeConstant: tau * k * 1000,
-          modifyTarget: () => to,
-          restDelta,
-        })
-      const side = tau * 1.3
+      // Dealt onto the spread. Every card makes the same trip whatever the
+      // flick, eased like a game card: it launches fast, travels at a nearly
+      // even pace, sails a touch past its spot and settles back. The sideways
+      // move eases out without the overshoot, which curves the path a little.
+      // It shrinks slightly ahead of its travel, so it reads as dropping onto
+      // the table.
+      const duration = tune.flightDuration.get()
+      const back = [0.34, tune.overshoot.get(), 0.64, 1] as const
+      const out = [0.25, 1, 0.5, 1] as const
       const runs = [
-        animate(x, t.x, {
-          type: 'spring',
-          stiffness: 1 / (side * side),
-          damping: 2 / side,
-          velocity: clamp(origin.vx * fx('sideCarry'), -600, 600),
-          restDelta: 0.2,
-        }),
-        glide(y, t.y, 1, 0.2),
-        glide(spin, t.rotate),
-        glide(pitch, 0),
-        glide(scale, t.scale, 0.75, 0.001),
-        glide(radius, t.radius, 0.75),
-        glide(shadow, t.shadow, 1, 0.001),
+        animate(x, t.x, { duration, ease: out }),
+        animate(y, t.y, { duration, ease: back }),
+        animate(spin, t.rotate, { duration, ease: back }),
+        animate(pitch, 0, { duration: duration * 0.7, ease: out }),
+        animate(scale, t.scale, { duration: duration * 0.75, ease: out }),
+        animate(radius, t.radius, { duration: duration * 0.75, ease: out }),
+        animate(shadow, t.shadow, { duration, ease: out }),
       ]
-      const air = tau * 4
-      const flight = animate(hop, [0, fx('toss'), 0], { duration: air, times: [0, 0.3, 1], ease: ['easeOut', 'easeIn'] })
+      const air = duration * 0.85
+      const flight = animate(hop, [0, fx('toss'), 0], { duration: air, times: [0, 0.4, 1], ease: ['easeOut', 'easeIn'] })
       // Touchdown.
       const landed = setTimeout(() => onLandRef.current(), air * 1000)
       return () => {

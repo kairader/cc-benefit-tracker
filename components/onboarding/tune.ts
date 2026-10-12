@@ -48,15 +48,15 @@ const defs = {
   snapBackBounce: { group: 'Flick', label: 'Drop-back bounce', value: 0.3, min: 0, max: 0.6, step: 0.02 },
 
   // Deal
-  flightTime: { group: 'Deal', label: 'Flight time', value: 0.16, min: 0.08, max: 0.4, step: 0.01, hint: 'seconds; how quickly a dealt card slows' },
-  sideCarry: { group: 'Deal', label: 'Sideways carry', value: 0.5, min: 0, max: 1, step: 0.05, hint: 'how much of a sideways flick bends the path' },
+  flightDuration: { group: 'Deal', label: 'Flight time', value: 0.42, min: 0.2, max: 0.9, step: 0.02, hint: 'seconds from hand to spread' },
+  overshoot: { group: 'Deal', label: 'Landing overshoot', value: 1.3, min: 1, max: 1.8, step: 0.05, hint: '1 lands dead; higher sails past and settles back' },
   pileScale: { group: 'Deal', label: 'Card size in spread', value: 0.42, min: 0.25, max: 0.7, step: 0.01 },
   spacing: { group: 'Deal', label: 'Card spacing', value: 52, min: 24, max: 90, step: 1 },
   rowStep: { group: 'Deal', label: 'Row spacing', value: 60, min: 30, max: 120, step: 2 },
   perRow: { group: 'Deal', label: 'Cards per row', value: 5, min: 2, max: 6, step: 1 },
   scatter: { group: 'Deal', label: 'Scatter', value: 4, min: 0, max: 12, step: 0.5, hint: 'turns and nudges, degrees' },
   toss: { group: 'Deal', label: 'Toss height', value: 0.1, min: 0, max: 0.4, step: 0.01, hint: 'how much it lifts off the table mid-flight' },
-  handGap: { group: 'Deal', label: 'Gap above hand', value: 64, min: 16, max: 160, step: 4 },
+  handGap: { group: 'Deal', label: 'Gap above hand', value: 168, min: 16, max: 320, step: 4 },
 } satisfies Record<string, Omit<Param, 'value'> & { value: number }>
 
 export type TuneKey = keyof typeof defs
@@ -112,7 +112,7 @@ if (typeof window !== 'undefined') {
   query.addEventListener('change', (e) => reducedMotion.set(e.matches ? 1 : 0))
 }
 
-type Flourish = 'lean' | 'tick' | 'swing' | 'pitch' | 'hang' | 'scatter' | 'toss' | 'sideCarry'
+type Flourish = 'lean' | 'tick' | 'swing' | 'pitch' | 'hang' | 'scatter' | 'toss'
 export const fx = (key: Flourish) => (reducedMotion.get() ? 0 : tune[key].get())
 
 export function changedValues() {

@@ -85,3 +85,17 @@
 .animate-glow-pulse {
   animation: glowPulse 0.5s ease-in-out;
 }
+
+/* Slow breathing glow on the onboarding's landing spot */
+@keyframes breathe {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.animate-breathe {
+  animation: breathe 2.4s ease-in-out infinite;
+}

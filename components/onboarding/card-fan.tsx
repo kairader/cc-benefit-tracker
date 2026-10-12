@@ -11,7 +11,7 @@ import {
   type MotionValue,
   type Transition,
 } from 'framer-motion'
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import type { HandCard } from '@/lib/demo-cards'
 import { CardFace } from './card-face'
 import { fx, reducedMotion, tune, useTune } from './tune'
@@ -65,6 +65,8 @@ interface CardFanProps {
   // Bump to have the whole hand settle with a small dip, once the cards that
   // matter are all in.
   exhale?: number
+  // Told whenever a different card comes to the front.
+  onFocus?: (card: HandCard) => void
 }
 
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v))
@@ -122,7 +124,7 @@ function nearestAddable(items: HandCard[], from: number) {
   return best
 }
 
-export function CardFan({ items, onFlick, exhale = 0 }: CardFanProps) {
+export function CardFan({ items, onFlick, exhale = 0, onFocus }: CardFanProps) {
   useTune()
   const offset = useMotionValue(Math.floor((items.length - 1) / 2))
   const handles = useRef(new Map<string, CardHandle>())
@@ -162,6 +164,41 @@ export function CardFan({ items, onFlick, exhale = 0 }: CardFanProps) {
       if (strength > 0) animate(tick, 0, { type: 'spring', velocity: strength * 40, stiffness: 700, damping: 24 })
     })
   }, [offset, tick])
+
+  const itemsRef = useRef(items)
+  const onFocusRef = useRef(onFocus)
+  useLayoutEffect(() => {
+    itemsRef.current = items
+    onFocusRef.current = onFocus
+  })
+  useEffect(() => {
+    let last: string | undefined
+    const report = () => {
+      const card = itemsRef.current[clamp(Math.round(offset.get()), 0, itemsRef.current.length - 1)]
+      if (!card || card.id === last) return
+      last = card.id
+      onFocusRef.current?.(card)
+    }
+    report()
+    const unsubscribe = offset.on('change', report)
+    return () => unsubscribe()
+  }, [offset, items])
+
+  // A hint on arrival: the front card hops up and drops back, showing that
+  // cards lift out of the hand. Skipped once the hand has been touched.
+  const touched = useRef(false)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (touched.current || reducedMotion.get()) return
+      const card = itemsRef.current[Math.round(offset.get())]
+      const h = card && handles.current.get(card.id)
+      if (!h) return
+      animate(h.dragY, -44, { type: 'spring', visualDuration: 0.22, bounce: 0 }).then(() => {
+        if (!touched.current) animate(h.dragY, 0, { type: 'spring', visualDuration: 0.5, bounce: 0.4 })
+      })
+    }, 900)
+    return () => clearTimeout(timer)
+  }, [offset])
 
   useEffect(() => {
     if (exhale && !reducedMotion.get()) animate(breath, 0, { type: 'spring', velocity: 60, stiffness: 200, damping: 18 })
@@ -224,11 +261,14 @@ export function CardFan({ items, onFlick, exhale = 0 }: CardFanProps) {
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (gesture.current) return
+    touched.current = true
     e.currentTarget.setPointerCapture(e.pointerId)
     // Cards that just left the hand can linger for a frame on their way out; ignore them.
     const hit = (e.target as HTMLElement).closest<HTMLElement>('[data-card-id]')?.dataset.cardId
     const cardId = hit && items.some((c) => c.id === hit) ? hit : nearestCardTo(e.clientX, e.clientY)
     offset.stop()
+    // Catch a card mid-hop (the arrival hint, or a tap's hop) where it is.
+    if (cardId) handles.current.get(cardId)?.dragY.stop()
     const index = items.findIndex((c) => c.id === cardId)
     gesture.current = {
       id: e.pointerId,
