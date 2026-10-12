@@ -17,7 +17,7 @@ import { CardFace } from './card-face'
 import { CardFan, CARD_H, CARD_W, type FlickOrigin } from './card-fan'
 import { fx, reducedMotion, tune, useTune } from './tune'
 import { TunePanel } from './tune-panel'
-import { place, type Placed } from './pile'
+import { spreadSpot } from './spread'
 
 type Phase = 'pick' | 'loading' | 'landing' | 'home'
 
@@ -27,16 +27,14 @@ interface Picked {
   // wallet but bow out before the home screen.
   data?: Card
   origin: FlickOrigin
-  // Where it comes to rest in the pile.
-  land: Placed
 }
 
 // 7/6 makes the front card 280 tall, so the stack's edges land on the 4px grid.
 const STACK_SCALE = 7 / 6
 const LOADING_MS = 1700
-// Height from the screen's bottom edge to just above the raised centre card
-// (the hand is anchored 248 up); the pile stays above it.
-const HAND_TOP = 248 + CARD_H / 2 + 40
+// Height from the screen's bottom edge to the top of the raised centre card
+// (the hand is anchored 248 up).
+const HAND_TOP = 248 + CARD_H / 2 + 16
 
 const EASE_OUT = [0.22, 1, 0.36, 1] as const
 const DATA_IDS = hand.filter((c) => c.cardId).map((c) => c.id)
@@ -87,38 +85,25 @@ export function Onboarding() {
   const caught = useRef(new Set<string>())
   const [tuning] = useState(() => new URLSearchParams(window.location.search).has('tune'))
   useTune()
-  const titleRef = useRef<HTMLHeadingElement>(null)
-  const pile = useRef<Placed[]>([])
+  const navRef = useRef<HTMLElement>(null)
+  const [navBottom, setNavBottom] = useState(44)
   const viewport = useViewport()
 
   // Loading stack centre, snapped to the 4px grid.
   const stackY = Math.round((viewport.h * 0.36) / 4) * 4
+
+  // The nav bar's height depends on the safe area, which only the layout knows.
+  useLayoutEffect(() => {
+    const measure = () => setNavBottom(navRef.current?.getBoundingClientRect().bottom ?? 44)
+    measure()
+  }, [viewport])
 
   const pickedIds = useMemo(() => new Set(picked.map((p) => p.card.id)), [picked])
   const items = useMemo(() => hand.filter((c) => !pickedIds.has(c.id)), [pickedIds])
 
   const handleFlick = useCallback((card: HandCard, origin: FlickOrigin) => {
     const data = cards.find((c) => c.id === card.cardId)
-    // Where the flick alone would leave it: sliding on with the table's
-    // friction, still turning with the spin it left the hand with.
-    const friction = tune.friction.get()
-    const spin = (origin.vr + origin.vx * 0.06) * fx('spinCarry')
-    const ideal = {
-      x: origin.x + origin.vx * friction,
-      y: origin.y + origin.vy * friction,
-      rotate: clamp(origin.rotate + spin * friction + (Math.random() * 2 - 1) * fx('scatter'), -24, 24),
-    }
-    // The table is the space between the title and the top of the hand.
-    const title = titleRef.current?.getBoundingClientRect()
-    const zone = {
-      left: 16,
-      right: window.innerWidth - 16,
-      top: (title?.bottom ?? 96) + 24,
-      bottom: window.innerHeight - HAND_TOP,
-    }
-    const land = place(ideal, pile.current, zone, tune.pileScale.get(), tune.reveal.get())
-    pile.current.push(land)
-    setPicked((prev) => [...prev, { card, data, origin, land }])
+    setPicked((prev) => [...prev, { card, data, origin }])
     return true
   }, [])
 
@@ -172,11 +157,24 @@ export function Onboarding() {
   const targetFor = (index: number, origin: FlickOrigin, at: Phase = phase): Target => {
     const base = { width: CARD_W, height: CARD_H, radius: 12, faceOpacity: 1, opacity: 1, deal: false }
     if (at === 'pick') {
-      const { land } = picked[index]
+      // The table is the space between the nav bar and the hand, less a gap
+      // that keeps the spread clear of the cards still in the hand.
       const pileScale = tune.pileScale.get()
+      const spot = spreadSpot(
+        index,
+        picked.length,
+        { top: navBottom + 24, bottom: viewport.h - HAND_TOP - tune.handGap.get(), centerX: viewport.w / 2 },
+        {
+          cardH: CARD_H * pileScale,
+          step: tune.spacing.get(),
+          rowStep: tune.rowStep.get(),
+          perRow: tune.perRow.get(),
+          scatter: fx('scatter'),
+        },
+      )
       return {
         ...base,
-        ...land,
+        ...spot,
         scale: pileScale,
         radius: 12 * pileScale,
         shadow: 0.15,
@@ -244,17 +242,17 @@ export function Onboarding() {
           animate={{ backgroundColor: phase === 'landing' ? 'rgba(10,10,10,0)' : 'rgba(10,10,10,1)' }}
           transition={{ duration: 0.4 }}
         >
-          <div className="mx-auto flex h-full max-w-md flex-col px-4 pt-16">
-            {/* Leaving is quieter than arriving: a quick fade, no movement. */}
+          <div className="mx-auto flex h-full max-w-md flex-col px-4 pt-[env(safe-area-inset-top)]">
+            {/* The title sits where an iOS nav bar would. Leaving is quieter
+                than arriving: a quick fade, no movement. */}
             <motion.header
+              ref={navRef}
+              className="flex h-11 shrink-0 items-center justify-center"
               initial={{ opacity: 0, filter: 'blur(4px)' }}
               animate={phase === 'pick' ? { opacity: 1, filter: 'blur(0px)' } : { opacity: 0, filter: 'blur(2px)' }}
               transition={phase === 'pick' ? { duration: 0.4, ease: 'easeOut' } : { duration: 0.2, ease: EASE_OUT }}
             >
-              <h1 ref={titleRef} className="text-center text-2xl font-medium text-white">
-                Add your cards
-              </h1>
-
+              <h1 className="text-[17px] font-medium text-white">Add your cards</h1>
             </motion.header>
 
             <motion.div
@@ -434,35 +432,39 @@ function FlyingCard({ picked, target, onLand }: { picked: Picked; target: Target
     }
 
     if (first && t.deal) {
-      // Dealt onto the table: it leaves at the flick's speed and slides to a
-      // stop under friction, so a harder flick travels further. If the pile
-      // nudged its spot, the glide is stretched or shortened to match, which
-      // keeps the starting speed true to the flick.
-      const friction = tune.friction.get()
-      const natural = Math.hypot(origin.vx, origin.vy) * friction
-      const distance = Math.hypot(t.x - x.get(), t.y - y.get())
-      const tau = friction * clamp(natural > 1 ? distance / natural : 1.6, 0.4, 1.6)
-      const glide = (mv: typeof x, to: number, restDelta = 0.01) =>
+      // Dealt onto the table. Every card makes the same trip whatever the
+      // flick: it rises out of the hand fast and eases to a stop on a fixed
+      // time constant, shrinking a little ahead of its travel so it reads as
+      // dropping away onto the table. A sideways flick bends the path a
+      // little rather than steering it.
+      const tau = tune.flightTime.get()
+      const glide = (mv: typeof x, to: number, k = 1, restDelta = 0.01) =>
         animate(mv, to, {
           type: 'inertia',
-          velocity: (to - mv.get()) / tau,
+          velocity: (to - mv.get()) / (tau * k),
           power: 1,
-          timeConstant: tau * 1000,
+          timeConstant: tau * k * 1000,
           modifyTarget: () => to,
           restDelta,
         })
+      const side = tau * 1.3
       const runs = [
-        glide(x, t.x, 0.2),
-        glide(y, t.y, 0.2),
+        animate(x, t.x, {
+          type: 'spring',
+          stiffness: 1 / (side * side),
+          damping: 2 / side,
+          velocity: clamp(origin.vx * fx('sideCarry'), -600, 600),
+          restDelta: 0.2,
+        }),
+        glide(y, t.y, 1, 0.2),
         glide(spin, t.rotate),
         glide(pitch, 0),
-        glide(scale, t.scale, 0.001),
-        glide(radius, t.radius),
-        glide(shadow, t.shadow, 0.001),
+        glide(scale, t.scale, 0.75, 0.001),
+        glide(radius, t.radius, 0.75),
+        glide(shadow, t.shadow, 1, 0.001),
       ]
-      const toss = fx('toss')
       const air = tau * 4
-      const flight = animate(hop, [0, toss, 0], { duration: air, times: [0, 0.3, 1], ease: ['easeOut', 'easeIn'] })
+      const flight = animate(hop, [0, fx('toss'), 0], { duration: air, times: [0, 0.3, 1], ease: ['easeOut', 'easeIn'] })
       // Touchdown.
       const landed = setTimeout(() => onLandRef.current(), air * 1000)
       return () => {
