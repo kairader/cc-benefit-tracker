@@ -25,9 +25,9 @@ const defs = {
   lean: { group: 'Swipe', label: 'Hand lean', value: 1.6, min: 0, max: 4, step: 0.1 },
 
   // Hand
-  radius: { group: 'Hand', label: 'Arc radius', value: 720, min: 400, max: 1400, step: 10 },
-  step: { group: 'Hand', label: 'Card spacing', value: 8.4, min: 3, max: 10, step: 0.1, hint: 'degrees' },
-  spread: { group: 'Hand', label: 'Gap around centre card', value: 3.4, min: 0, max: 8, step: 0.1, hint: 'degrees' },
+  radius: { group: 'Hand', label: 'Arc radius', value: 240, min: 160, max: 1400, step: 10 },
+  step: { group: 'Hand', label: 'Card spacing', value: 10, min: 3, max: 16, step: 0.1, hint: 'degrees' },
+  spread: { group: 'Hand', label: 'Gap around centre card', value: 3, min: 0, max: 8, step: 0.1, hint: 'degrees' },
   lift: { group: 'Hand', label: 'Centre card lift', value: 16, min: 0, max: 40, step: 1 },
   close: { group: 'Hand', label: 'Close gap while holding', value: 0.5, min: 0, max: 1, step: 0.05 },
 

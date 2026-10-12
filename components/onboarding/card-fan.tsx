@@ -36,7 +36,6 @@ export interface FlickOrigin {
   rotate: number
   scale: number
   pitch: number
-  shadow: number
   vx: number
   vy: number
   vr: number
@@ -48,7 +47,6 @@ interface CardHandle {
   rotate: MotionValue<number>
   scale: MotionValue<number>
   pitch: MotionValue<number>
-  shadow: MotionValue<number>
   pinX: MotionValue<number>
   pinY: MotionValue<number>
   pinRotate: MotionValue<number>
@@ -367,7 +365,6 @@ export function CardFan({ items, onFlick, exhale = 0 }: CardFanProps) {
         rotate: h.rotate.get(),
         scale: h.scale.get(),
         pitch: h.pitch.get(),
-        shadow: h.shadow.get(),
         vx,
         vy,
         vr: h.rotate.getVelocity(),
@@ -528,12 +525,6 @@ function FanCard({ card, index, offset, lean, hold, tick, breath, register }: Fa
   const display = useTransform(() =>
     fade.get() > 0 && Math.abs(x.get()) < window.innerWidth / 2 + CARD_W * 0.7 ? 'block' : 'none',
   )
-  // The shadow is a pre-blurred layer that only moves and fades, which the GPU
-  // can do without repainting.
-  const shadowLevel = useTransform(() => Math.max(focus.get() * 0.4, lifted.get()))
-  const shadowY = useTransform(shadowLevel, (l) => l * 24)
-  const shadowScale = useTransform(shadowLevel, (l) => 0.96 + l * 0.06)
-  const shadowOpacity = useTransform(shadowLevel, (l) => 0.55 + l * 0.45)
 
   useEffect(() => {
     const fold = () => {
@@ -549,7 +540,6 @@ function FanCard({ card, index, offset, lean, hold, tick, breath, register }: Fa
       rotate,
       scale,
       pitch,
-      shadow: shadowLevel,
       pinX,
       pinY,
       pinRotate,
@@ -559,7 +549,7 @@ function FanCard({ card, index, offset, lean, hold, tick, breath, register }: Fa
       el: ref.current,
     })
     return () => register(card.id, null)
-  }, [card.id, register, dragX, dragY, rotate, scale, pitch, shadowLevel, pinX, pinY, pinRotate, pinScale, side, shift, slot])
+  }, [card.id, register, dragX, dragY, rotate, scale, pitch, pinX, pinY, pinRotate, pinScale, side, shift, slot])
 
   return (
     <motion.div
@@ -596,11 +586,6 @@ function FanCard({ card, index, offset, lean, hold, tick, breath, register }: Fa
         className="h-full w-full"
       >
         <div ref={ref} data-card-id={card.id} className="relative h-full w-full rounded-[12px]">
-          <motion.div
-            aria-hidden
-            className="pointer-events-none absolute inset-0 rounded-[12px] shadow-[0_32px_48px_-12px_rgba(0,0,0,0.9)] will-change-transform"
-            style={{ y: shadowY, scale: shadowScale, opacity: shadowOpacity }}
-          />
           <CardFace card={card} />
           <motion.div className="pointer-events-none absolute inset-0 rounded-[12px] bg-black" style={{ opacity: shade }} />
         </div>

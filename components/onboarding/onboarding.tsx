@@ -51,7 +51,6 @@ interface Target {
   radius: number
   faceOpacity: number
   opacity: number
-  shadow: number
   // Being dealt onto the pile: it slides to a stop like a card on a table.
   deal: boolean
   // Folding into a glow bar: the card flashes its own colour before settling white.
@@ -180,7 +179,6 @@ export function Onboarding() {
         ...spot,
         scale: pileScale,
         radius: 12 * pileScale,
-        shadow: 0.15,
         deal: true,
         spring: same({ type: 'spring', visualDuration: 0.4, bounce: 0 }),
       }
@@ -195,7 +193,6 @@ export function Onboarding() {
         scale: STACK_SCALE - fromTop * 0.05,
         rotate: (index - (n - 1) / 2) * 4,
         radius: 16,
-        shadow: 0.6,
         spring: same({ type: 'spring', stiffness: 200, damping: 24, delay: index * 0.05 }),
       }
     }
@@ -217,7 +214,6 @@ export function Onboarding() {
       radius: 2,
       faceOpacity: 0,
       opacity: 1,
-      shadow: 0,
       deal: false,
       tint: { delay },
       spring: same({ type: 'spring', stiffness: 210, damping: 28, delay }),
@@ -382,8 +378,8 @@ export function Onboarding() {
 
 function FlyingCard({ picked, target, onLand }: { picked: Picked; target: Target; onLand: () => void }) {
   const { origin, card, data } = picked
-  // Starts exactly as the card left the hand: same place, turn, tilt, scale
-  // and shadow, moving at the same speed.
+  // Starts exactly as the card left the hand: same place, turn, tilt and
+  // scale, moving at the same speed.
   const x = useMotionValue(origin.x)
   const y = useMotionValue(origin.y)
   const spin = useMotionValue(origin.rotate)
@@ -396,17 +392,11 @@ function FlyingCard({ picked, target, onLand }: { picked: Picked; target: Target
   // Corner radius as it looks on screen.
   const radius = useMotionValue(12 * origin.scale)
   const opacity = useMotionValue(1)
-  const shadow = useMotionValue(origin.shadow)
-  // Height off the table while it's tossed: it grows a little and casts a
-  // longer shadow, then settles.
+  // Height off the table while it's tossed: it grows a little, then settles.
   const hop = useMotionValue(0)
   const tint = useMotionValue(0)
 
   const size = useTransform(() => scale.get() * (1 + hop.get()))
-  const lift = useTransform(() => Math.min(1, shadow.get() + hop.get() * 5))
-  const shadowY = useTransform(lift, (l) => l * 24)
-  const shadowScale = useTransform(lift, (l) => 0.96 + l * 0.06)
-  const shadowOpacity = useTransform(lift, (l) => 0.55 + l * 0.45)
   // Elliptical corners in the card's own space, so they stay round on screen
   // however unevenly it's squeezed.
   const borderRadius = useTransform(() => {
@@ -424,7 +414,7 @@ function FlyingCard({ picked, target, onLand }: { picked: Picked; target: Target
   // The target it was first sent to. An effect re-run for that same target
   // (React's dev double-run) restarts the launch rather than skipping it.
   const firstKey = useRef<string | null>(null)
-  const key = [target.x, target.y, target.scale, target.rotate, target.width, target.height, target.radius, target.opacity, target.shadow].join()
+  const key = [target.x, target.y, target.scale, target.rotate, target.width, target.height, target.radius, target.opacity].join()
 
   useEffect(() => {
     const t = targetRef.current
@@ -449,7 +439,6 @@ function FlyingCard({ picked, target, onLand }: { picked: Picked; target: Target
       foldX.jump(t.width / CARD_W)
       foldY.jump(t.height / CARD_H)
       radius.jump(t.radius)
-      shadow.jump(t.shadow)
       scale.jump(t.scale * 0.96)
       opacity.jump(0)
       const fade = { duration: 0.2, ease: EASE_OUT }
@@ -475,7 +464,6 @@ function FlyingCard({ picked, target, onLand }: { picked: Picked; target: Target
         animate(pitch, 0, { duration: duration * 0.7, ease: out }),
         animate(scale, t.scale, { duration: duration * 0.75, ease: out }),
         animate(radius, t.radius, { duration: duration * 0.75, ease: out }),
-        animate(shadow, t.shadow, { duration, ease: out }),
       ]
       const air = duration * 0.85
       const flight = animate(hop, [0, fx('toss'), 0], { duration: air, times: [0, 0.4, 1], ease: ['easeOut', 'easeIn'] })
@@ -498,10 +486,9 @@ function FlyingCard({ picked, target, onLand }: { picked: Picked; target: Target
       animate(foldY, t.height / CARD_H, t.spring.rest),
       animate(radius, t.radius, t.spring.rest),
       animate(opacity, t.opacity, t.spring.rest),
-      animate(shadow, t.shadow, t.spring.rest),
     ]
     return () => runs.forEach((r) => r.stop())
-  }, [key, origin, x, y, spin, pitch, scale, foldX, foldY, radius, opacity, shadow, hop, tint])
+  }, [key, origin, x, y, spin, pitch, scale, foldX, foldY, radius, opacity, hop, tint])
 
   return (
     <motion.div className="pointer-events-none fixed left-0 top-0 z-50" style={{ x, y, opacity }}>
@@ -520,11 +507,6 @@ function FlyingCard({ picked, target, onLand }: { picked: Picked; target: Target
           transformPerspective: 900,
         }}
       >
-        <motion.div
-          aria-hidden
-          className="absolute inset-0 shadow-[0_32px_48px_-12px_rgba(0,0,0,0.9)] will-change-transform"
-          style={{ borderRadius, y: shadowY, scale: shadowScale, opacity: shadowOpacity }}
-        />
         <motion.div className="absolute inset-0 overflow-hidden bg-white" style={{ borderRadius }}>
           {data && <motion.div className="absolute inset-0" style={{ background: data.glowColor, opacity: tint }} />}
           <motion.div
