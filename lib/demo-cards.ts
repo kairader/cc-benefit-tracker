@@ -4,21 +4,27 @@ export interface HandCard {
   id: string
   name: string
   issuer: string
-  hue: number
+  // Portrait art in public/cards, rotated so the card reads top to bottom.
+  image: string
   cardId?: string
 }
 
-// The real cards sit together in the middle so the demo starts on them.
+// Ordered so light and dark faces alternate, mirrored about the centre:
+// the two saturated cards (Freedom blue, Bank of America red) sit either side
+// of the real cards, and the hand opens on Sapphire Preferred between Gold
+// and Platinum.
 export const hand: HandCard[] = [
-  { id: 'chase-freedom-unlimited', name: 'Freedom Unlimited', issuer: 'Chase', hue: 250 },
-  { id: 'capital-one-venture-x', name: 'Venture X', issuer: 'Capital One', hue: 30 },
-  { id: 'chase-sapphire-reserve', name: 'Sapphire Reserve', issuer: 'Chase', hue: 260 },
-  { id: 'citi-strata-premier', name: 'Strata Premier', issuer: 'Citi', hue: 200 },
-  { id: 'amex-gold', name: 'Gold Card', issuer: 'American Express', hue: 85, cardId: 'amex-gold' },
-  { id: 'amex-platinum', name: 'Platinum Card', issuer: 'American Express', hue: 240, cardId: 'amex-platinum' },
-  { id: 'chase-sapphire-preferred', name: 'Sapphire Preferred', issuer: 'Chase', hue: 220, cardId: 'chase-sapphire-preferred' },
-  { id: 'bilt-mastercard', name: 'Bilt Mastercard', issuer: 'Bilt', hue: 0 },
-  { id: 'amex-green', name: 'Green Card', issuer: 'American Express', hue: 150 },
-  { id: 'hilton-aspire', name: 'Hilton Aspire', issuer: 'American Express', hue: 300 },
-  { id: 'apple-card', name: 'Apple Card', issuer: 'Goldman Sachs', hue: 120 },
+  { id: 'bilt-mastercard', name: 'Bilt Mastercard', issuer: 'Bilt', image: 'bilt-mastercard' },
+  { id: 'amex-green', name: 'Green Card', issuer: 'American Express', image: 'amex-green' },
+  { id: 'united-quest', name: 'MileagePlus Quest', issuer: 'Chase', image: 'united-quest' },
+  { id: 'chase-freedom', name: 'Freedom', issuer: 'Chase', image: 'chase-freedom' },
+  { id: 'amex-gold', name: 'Gold Card', issuer: 'American Express', image: 'amex-gold', cardId: 'amex-gold' },
+  { id: 'chase-sapphire-preferred', name: 'Sapphire Preferred', issuer: 'Chase', image: 'chase-sapphire-preferred', cardId: 'chase-sapphire-preferred' },
+  { id: 'amex-platinum', name: 'Platinum Card', issuer: 'American Express', image: 'amex-platinum', cardId: 'amex-platinum' },
+  { id: 'boa-cash-rewards', name: 'Cash Rewards', issuer: 'Bank of America', image: 'boa-cash-rewards' },
+  { id: 'capital-one-venture-x', name: 'Venture X', issuer: 'Capital One', image: 'capital-one-venture-x' },
+  { id: 'citi-strata', name: 'Strata', issuer: 'Citi', image: 'citi-strata' },
+  { id: 'capital-one-quicksilver', name: 'Quicksilver', issuer: 'Capital One', image: 'capital-one-quicksilver' },
 ]
+
+export const cardImage = (card: HandCard) => `${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/cards/${card.image}.webp`
