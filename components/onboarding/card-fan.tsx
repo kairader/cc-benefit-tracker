@@ -16,8 +16,8 @@ import type { HandCard } from '@/lib/demo-cards'
 import { CardFace } from './card-face'
 import { fx, reducedMotion, tune, useTune } from './tune'
 
-export const CARD_W = 152
-export const CARD_H = 240
+export const CARD_W = 144
+export const CARD_H = 228
 
 // Cards sit on an arc around a pivot well below the screen, like a hand of
 // cards. Radius, spacing, the gap around the centre card and the lift all

@@ -29,8 +29,8 @@ interface Picked {
   origin: FlickOrigin
 }
 
-// 7/6 makes the front card 280 tall, so the stack's edges land on the 4px grid.
-const STACK_SCALE = 7 / 6
+// Makes the front card 280 tall, so the stack's edges land on the 4px grid.
+const STACK_SCALE = 280 / CARD_H
 const LOADING_MS = 1700
 // Height from the screen's bottom edge to the top of the raised centre card
 // (the hand is anchored 248 up).
@@ -160,7 +160,7 @@ export function Onboarding() {
     spreadSpot(
       index,
       count,
-      { top: navBottom + 24, bottom: viewport.h - HAND_TOP - tune.handGap.get(), centerX: viewport.w / 2 },
+      { top: navBottom + 32, bottom: viewport.h - HAND_TOP - tune.handGap.get(), centerX: viewport.w / 2 },
       {
         cardH: CARD_H * pileScale,
         step: tune.spacing.get(),
@@ -268,16 +268,16 @@ export function Onboarding() {
           </motion.div>
 
           <div className="mx-auto flex h-full max-w-md flex-col px-4 pt-[env(safe-area-inset-top)]">
-            {/* The title sits where an iOS nav bar would. Leaving is quieter
+            {/* The title sits up top: 16 above it, 32 tall. Leaving is quieter
                 than arriving: a quick fade, no movement. */}
             <motion.header
               ref={navRef}
-              className="flex h-11 shrink-0 items-center justify-center"
+              className="flex h-12 shrink-0 items-end justify-center"
               initial={{ opacity: 0, filter: 'blur(4px)' }}
               animate={phase === 'pick' ? { opacity: 1, filter: 'blur(0px)' } : { opacity: 0, filter: 'blur(2px)' }}
               transition={phase === 'pick' ? { duration: 0.4, ease: 'easeOut' } : { duration: 0.2, ease: EASE_OUT }}
             >
-              <h1 className="text-base font-medium text-white">Add your cards</h1>
+              <h1 className="text-2xl font-medium text-white">Add your cards</h1>
             </motion.header>
 
             <motion.div
