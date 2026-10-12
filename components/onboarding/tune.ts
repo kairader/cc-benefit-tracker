@@ -25,6 +25,17 @@ const defs = {
   tick: { group: 'Swipe', label: 'Detent tick', value: 4, min: 0, max: 12, step: 0.5, hint: 'px pop as each card passes the centre' },
   lean: { group: 'Swipe', label: 'Hand lean', value: 1.6, min: 0, max: 4, step: 0.1 },
 
+  // Rolodex
+  flipDistance: { group: 'Rolodex', label: 'Drag per card', value: 64, min: 24, max: 160, step: 4, hint: 'px of drag to flip one card' },
+  hubRadius: { group: 'Rolodex', label: 'Drum radius', value: 16, min: 0, max: 120, step: 4 },
+  backStep: { group: 'Rolodex', label: 'Lean between cards', value: 14, min: 2, max: 20, step: 0.5, hint: 'degrees, cards behind the front one' },
+  backGap: { group: 'Rolodex', label: 'Gap behind front card', value: 4, min: 0, max: 20, step: 0.5, hint: 'degrees' },
+  flop: { group: 'Rolodex', label: 'Fall of flipped card', value: 66, min: 30, max: 110, step: 1, hint: 'degrees' },
+  frontStep: { group: 'Rolodex', label: 'Lean of flipped cards', value: 6, min: 0, max: 20, step: 0.5, hint: 'degrees' },
+  camera: { group: 'Rolodex', label: 'Perspective', value: 900, min: 300, max: 2400, step: 20, hint: 'px; lower is more dramatic' },
+  cameraHeight: { group: 'Rolodex', label: 'Eye height', value: 700, min: 0, max: 1200, step: 10, hint: 'px above the axle' },
+  tilt: { group: 'Rolodex', label: 'Drum tilt', value: -15, min: -40, max: 40, step: 1, hint: 'degrees; negative tips it toward you' },
+
   // Hand
   radius: { group: 'Hand', label: 'Arc radius', value: 240, min: 160, max: 1400, step: 10 },
   step: { group: 'Hand', label: 'Card spacing', value: 10, min: 3, max: 16, step: 0.1, hint: 'degrees' },
