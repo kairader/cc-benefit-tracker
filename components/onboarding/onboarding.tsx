@@ -168,6 +168,12 @@ export function Onboarding() {
       },
     )
   const nextSpot = spotFor(picked.length, picked.length + 1)
+  // Add sits centred a set gap under the lowest card on the table (counting
+  // the landing spot), snapped to the 4px grid.
+  const tableBottom = Math.max(
+    ...Array.from({ length: picked.length + 1 }, (_, i) => spotFor(i, picked.length + 1).y),
+  ) + (CARD_H * pileScale) / 2
+  const addTop = Math.ceil((tableBottom + 24) / 4) * 4
 
   const targetFor = (index: number, origin: FlickOrigin, at: Phase = phase): Target => {
     const base = { width: CARD_W, height: CARD_H, radius: 12, faceOpacity: 1, opacity: 1, deal: false }
@@ -267,29 +273,12 @@ export function Onboarding() {
                 than arriving: a quick fade, no movement. */}
             <motion.header
               ref={navRef}
-              className="relative flex h-12 shrink-0 items-end"
+              className="flex h-12 shrink-0 items-end justify-center"
               initial={{ opacity: 0, filter: 'blur(4px)' }}
               animate={phase === 'pick' ? { opacity: 1, filter: 'blur(0px)' } : { opacity: 0, filter: 'blur(2px)' }}
               transition={phase === 'pick' ? { duration: 0.4, ease: 'easeOut' } : { duration: 0.2, ease: EASE_OUT }}
             >
               <h1 className="flex h-8 items-center text-xl font-medium text-white">Add your cards</h1>
-              {/* The trailing nav bar action, on the title's line. */}
-              <AnimatePresence>
-                {phase === 'pick' && picked.length > 0 && (
-                  <motion.button
-                    type="button"
-                    onClick={() => setPhase('loading')}
-                    initial={{ opacity: 0, scale: 0.8, filter: 'blur(4px)' }}
-                    animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-                    exit={{ opacity: 0, scale: 0.8 }}
-                    whileTap={{ scale: 0.94 }}
-                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                    className="absolute bottom-0 right-0 h-8 rounded-full bg-white px-4 text-base font-medium tabular-nums text-neutral-950"
-                  >
-                    Add {picked.length}
-                  </motion.button>
-                )}
-              </AnimatePresence>
             </motion.header>
 
             <motion.div
@@ -305,6 +294,37 @@ export function Onboarding() {
             </motion.div>
 
           </div>
+
+          {/* Add, under the table. It follows the landing spot down when a new
+              row starts, on the same beat. */}
+          <motion.div
+            className="absolute left-0 top-0 z-20"
+            initial={false}
+            animate={{ x: viewport.w / 2, y: addTop }}
+            transition={{
+              type: 'spring',
+              visualDuration: 0.4,
+              bounce: 0,
+              delay: picked.length ? tune.flightDuration.get() * 0.6 : 0,
+            }}
+          >
+            <AnimatePresence>
+              {phase === 'pick' && picked.length > 0 && (
+                <motion.button
+                  type="button"
+                  onClick={() => setPhase('loading')}
+                  initial={{ opacity: 0, scale: 0.8, filter: 'blur(4px)' }}
+                  animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+                  exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.15 } }}
+                  whileTap={{ scale: 0.94 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 30, delay: picked.length === 1 ? tune.flightDuration.get() * 0.6 : 0 }}
+                  className="h-8 -translate-x-1/2 rounded-full bg-white px-4 text-base font-medium tabular-nums text-neutral-950"
+                >
+                  Add {picked.length}
+                </motion.button>
+              )}
+            </AnimatePresence>
+          </motion.div>
 
           <AnimatePresence>
             {(phase === 'loading' || phase === 'landing') && (
