@@ -74,6 +74,9 @@ function useViewport() {
 // lower, so together they ramp from nothing at the top to the full glass at
 // the button's top edge.
 const GLASS_FADE = 64
+// How far the overlay reaches below the screen's bottom edge: deeper than
+// Safari's toolbar, so whatever it covers is still the onboarding.
+const BLEED = 160
 const GLASS = [1, 2, 4, 8].map((blur, i, all) => {
   const from = (GLASS_FADE * i) / all.length
   const to = (GLASS_FADE * (i + 1)) / all.length
@@ -248,9 +251,20 @@ export function Onboarding() {
         <HomeView cards={homeCards} intro={phase === 'home' ? 'revealed' : 'hidden'} found={totalFound} />
       )}
 
+      {/* Safari 26 on iPhone draws nothing past the end of the page under its
+          floating toolbar, so while the overlay is up the page is made taller
+          than the screen. The overlay blocks scrolling, so it never moves. */}
+      {showOverlay && <div aria-hidden className="safari-runway" />}
+
       {showOverlay && (
+        // The overlay runs BLEED past the bottom of the screen, and pads it
+        // back out so the layout inside still ends at the visible edge. That
+        // way the drum keeps drawing under Safari's toolbar, and Safari, which
+        // tints its toolbar from any screen-sized fixed layer touching the
+        // bottom edge, sees a layer too tall to count and leaves the bar clear.
         <motion.div
-          className="fixed inset-0 z-40 overflow-hidden bg-neutral-950"
+          className="fixed inset-x-0 top-0 z-40 touch-none overflow-hidden bg-neutral-950"
+          style={{ bottom: -BLEED, paddingBottom: BLEED }}
           animate={{ backgroundColor: phase === 'landing' ? 'rgba(10,10,10,0)' : 'rgba(10,10,10,1)' }}
           transition={{ duration: 0.4 }}
         >
@@ -304,16 +318,17 @@ export function Onboarding() {
           </div>
 
           {/* Add, pinned to the bottom of the screen on a sheet of glass that
-              runs to the left, right and bottom edges. The glass is at full
-              strength behind the button and fades out above it, built from
-              stacked blurs that each start a little lower, so the drum
-              softens gradually as it turns under it. Each layer fades itself
-              in: opacity on a shared parent would switch off the blur. */}
+              runs to the left, right and bottom edges, and on under Safari's
+              toolbar. The glass is at full strength behind the button and
+              fades out above it, built from stacked blurs that each start a
+              little lower, so the drum softens gradually as it turns under
+              it. Each layer fades itself in: opacity on a shared parent would
+              switch off the blur. */}
           <AnimatePresence>
             {phase === 'pick' && picked.length > 0 && (
               <motion.div
-                className="pointer-events-none fixed inset-x-0 bottom-0 z-20 px-4 pb-[max(24px,env(safe-area-inset-bottom))]"
-                style={{ paddingTop: GLASS_FADE }}
+                className="pointer-events-none absolute inset-x-0 z-20 px-4 pb-[max(24px,env(safe-area-inset-bottom))]"
+                style={{ bottom: BLEED, paddingTop: GLASS_FADE }}
                 initial="hidden"
                 animate="shown"
                 exit="hidden"
@@ -322,8 +337,9 @@ export function Onboarding() {
                   <motion.div
                     key={i}
                     aria-hidden
-                    className="absolute inset-0"
+                    className="absolute inset-x-0 top-0"
                     style={{
+                      bottom: -BLEED,
                       backdropFilter: layer.filter,
                       WebkitBackdropFilter: layer.filter,
                       maskImage: layer.mask,

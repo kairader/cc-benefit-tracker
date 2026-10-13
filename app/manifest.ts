@@ -2,14 +2,16 @@ import type { MetadataRoute } from 'next'
 
 export const dynamic = 'force-static'
 
-const basePath = '/cc-benefit-tracker'
+// Empty on Vercel previews, '/cc-benefit-tracker' on GitHub Pages.
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? ''
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: 'Credit Tracker',
     short_name: 'Credits',
     description: 'Track credit card benefits',
-    start_url: basePath,
+    // No start_url: a Home Screen app opens the page it was added from, so the
+    // onboarding demo can be added and recorded full screen.
     display: 'standalone',
     background_color: '#0a0a0a',
     theme_color: '#0a0a0a',

@@ -99,3 +99,15 @@
 .animate-breathe {
   animation: breathe 2.4s ease-in-out infinite;
 }
+
+/* Extra page height for the onboarding on iPhone only (see Onboarding). */
+.safari-runway {
+  display: none;
+}
+
+@supports (-webkit-touch-callout: none) {
+  .safari-runway {
+    display: block;
+    height: calc(100lvh + 160px);
+  }
+}
