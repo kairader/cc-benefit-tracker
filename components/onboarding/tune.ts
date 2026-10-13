@@ -27,14 +27,16 @@ const defs = {
 
   // Rolodex
   flipDistance: { group: 'Rolodex', label: 'Drag per card', value: 64, min: 24, max: 160, step: 4, hint: 'px of drag to flip one card' },
+  axle: { group: 'Rolodex', label: 'Axle height', value: -40, min: -200, max: 200, step: 4, hint: 'px above the screen bottom; below zero crops the cards' },
+  peek: { group: 'Rolodex', label: 'Card tops showing', value: 28, min: 0, max: 40, step: 1, hint: 'px each card behind stands above the one in front' },
   hubRadius: { group: 'Rolodex', label: 'Drum radius', value: 16, min: 0, max: 120, step: 4 },
-  backStep: { group: 'Rolodex', label: 'Lean between cards', value: 14, min: 2, max: 20, step: 0.5, hint: 'degrees, cards behind the front one' },
-  backGap: { group: 'Rolodex', label: 'Gap behind front card', value: 4, min: 0, max: 20, step: 0.5, hint: 'degrees' },
+  backStep: { group: 'Rolodex', label: 'Lean between cards', value: 8, min: 2, max: 20, step: 0.5, hint: 'degrees, cards behind the front one' },
+  backGap: { group: 'Rolodex', label: 'Gap behind front card', value: 3, min: 0, max: 20, step: 0.5, hint: 'degrees' },
   flop: { group: 'Rolodex', label: 'Fall of flipped card', value: 66, min: 30, max: 110, step: 1, hint: 'degrees' },
   frontStep: { group: 'Rolodex', label: 'Lean of flipped cards', value: 6, min: 0, max: 20, step: 0.5, hint: 'degrees' },
   camera: { group: 'Rolodex', label: 'Perspective', value: 900, min: 300, max: 2400, step: 20, hint: 'px; lower is more dramatic' },
-  cameraHeight: { group: 'Rolodex', label: 'Eye height', value: 700, min: 0, max: 1200, step: 10, hint: 'px above the axle' },
-  tilt: { group: 'Rolodex', label: 'Drum tilt', value: -15, min: -40, max: 40, step: 1, hint: 'degrees; negative tips it toward you' },
+  cameraHeight: { group: 'Rolodex', label: 'Eye height', value: 600, min: 0, max: 1200, step: 10, hint: 'px above the axle' },
+  tilt: { group: 'Rolodex', label: 'Drum tilt', value: 0, min: -40, max: 40, step: 1, hint: 'degrees; negative tips it toward you' },
 
   // Hand
   radius: { group: 'Hand', label: 'Arc radius', value: 240, min: 160, max: 1400, step: 10 },

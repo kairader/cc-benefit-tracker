@@ -4,7 +4,7 @@ export interface HandCard {
   id: string
   name: string
   issuer: string
-  // Card art in public/cards, sized to the hand card at 3x.
+  // Card art in public/cards, sized for the rolodex card at 3x.
   image: string
   cardId?: string
 }

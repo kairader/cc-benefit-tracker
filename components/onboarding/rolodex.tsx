@@ -7,15 +7,14 @@ import { CardFace } from './card-face'
 import { CARD_W, type FlickOrigin } from './card-fan'
 import { fx, reducedMotion, tune, useTune } from './tune'
 
-// The hand as an old-school rotary card file: cards stand on a drum near the
-// bottom of the screen. Dragging down flips the front card toward you and
-// brings up the one behind it; the drum is a closed loop, so flipping one way
-// reaches every card. Pulling the front card up lifts it out of the file.
+// The hand as an old-school rotary card file: big cards stand on a drum just
+// below the bottom of the screen, so their lower edges are cut off. Each
+// direction has one job: dragging down flips the front card toward you and
+// brings up the one behind (the drum is a closed loop, so that reaches every
+// card), and dragging up pulls the front card out of the file.
 
-export const ROLODEX_W = 240
-export const ROLODEX_H = 152
-// Height of the drum's axle above the bottom of the screen.
-const AXLE = 112
+export const ROLODEX_W = 360
+export const ROLODEX_H = 228
 
 const settle: Transition = { type: 'spring', visualDuration: 0.45, bounce: 0.1 }
 const snapBack = (): Transition => ({
@@ -43,6 +42,8 @@ const project = (velocity: number, rate = 0.99) => ((velocity / 1000) * rate) / 
 interface Handle {
   dragX: MotionValue<number>
   dragY: MotionValue<number>
+  // 1 once the card is pulled far enough that letting go adds it.
+  armed: MotionValue<number>
   el: HTMLDivElement | null
 }
 
@@ -70,6 +71,7 @@ export function Rolodex({ items, onFlick, exhale = 0 }: RolodexProps) {
     startOffset: number
     cardId: string | null
     mode: 'flip' | 'pull' | 'none' | null
+    armed: boolean
     samples: { x: number; y: number; t: number }[]
   } | null>(null)
 
@@ -93,11 +95,12 @@ export function Rolodex({ items, onFlick, exhale = 0 }: RolodexProps) {
     })
   }, [offset, tick])
 
-  // A hint on arrival: the front card rises partway out of the file and
-  // drops back. Skipped once the file has been touched.
+  // A two-part hint on arrival, one for each direction: the front card rises
+  // partway out of the file and drops back, then the file starts to flip
+  // forward and settles back. Skipped once the file has been touched.
   const touched = useRef(false)
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const pullHint = setTimeout(() => {
       if (touched.current || reducedMotion.get()) return
       const card = itemsRef.current[frontIndex()]
       const h = card && handles.current.get(card.id)
@@ -106,7 +109,17 @@ export function Rolodex({ items, onFlick, exhale = 0 }: RolodexProps) {
         if (!touched.current) animate(h.dragY, 0, { type: 'spring', visualDuration: 0.5, bounce: 0.4 })
       })
     }, 900)
-    return () => clearTimeout(timer)
+    const flipHint = setTimeout(() => {
+      if (touched.current || reducedMotion.get()) return
+      const from = offset.get()
+      animate(offset, from + 0.3, { type: 'spring', visualDuration: 0.25, bounce: 0 }).then(() => {
+        if (!touched.current) animate(offset, from, { type: 'spring', visualDuration: 0.5, bounce: 0.35 })
+      })
+    }, 2000)
+    return () => {
+      clearTimeout(pullHint)
+      clearTimeout(flipHint)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on arrival
   }, [])
 
@@ -166,6 +179,7 @@ export function Rolodex({ items, onFlick, exhale = 0 }: RolodexProps) {
       startOffset: offset.get(),
       cardId,
       mode: null,
+      armed: false,
       samples: [{ x: e.clientX, y: e.clientY, t: e.timeStamp }],
     }
   }
@@ -180,11 +194,14 @@ export function Rolodex({ items, onFlick, exhale = 0 }: RolodexProps) {
 
     if (!g.mode) {
       if (Math.hypot(dx, dy) < 6) return
-      const onFront = g.cardId !== null && items[frontIndex()]?.id === g.cardId
-      // Mostly sideways does nothing; up on the front card pulls it out;
-      // anything else flips.
+      // Mostly sideways does nothing. Otherwise the direction decides,
+      // wherever the drag starts: up pulls the front card, down flips.
       if (Math.abs(dx) > Math.abs(dy) * 1.2) g.mode = 'none'
-      else g.mode = onFront && dy < 0 ? 'pull' : 'flip'
+      else if (dy < 0) {
+        g.mode = 'pull'
+        g.cardId = items[frontIndex()]?.id ?? null
+        if (g.cardId) handles.current.get(g.cardId)?.dragY.stop()
+      } else g.mode = 'flip'
     }
 
     if (g.mode === 'flip') {
@@ -196,6 +213,13 @@ export function Rolodex({ items, onFlick, exhale = 0 }: RolodexProps) {
       // sideways once it's clear of the file.
       h.dragY.set(dy < 0 ? dy : dy * 0.15)
       h.dragX.set(dx * clamp(-dy / 120, 0, 1))
+      // Past the line it unclips from the rail with a small pop, so you know
+      // letting go will add it.
+      const armed = dy < -tune.flickDistance.get()
+      if (armed !== g.armed) {
+        g.armed = armed
+        animate(h.armed, armed ? 1 : 0, { type: 'spring', visualDuration: 0.25, bounce: armed ? 0.5 : 0 })
+      }
     }
   }
 
@@ -232,6 +256,7 @@ export function Rolodex({ items, onFlick, exhale = 0 }: RolodexProps) {
     }
 
     if (!card || !h) return
+    animate(h.armed, 0, { duration: 0.2 })
     const isFlick =
       dy < -tune.flickDistance.get() ||
       (dy < -12 && (vy < -tune.flickVelocity.get() || dy + project(vy) < -tune.flickProjection.get()))
@@ -282,7 +307,7 @@ export function Rolodex({ items, onFlick, exhale = 0 }: RolodexProps) {
       className="absolute inset-0 touch-none select-none"
       style={{
         perspective: tune.camera.get(),
-        perspectiveOrigin: `50% calc(100% - ${AXLE + tune.cameraHeight.get()}px)`,
+        perspectiveOrigin: `50% calc(100% - ${tune.axle.get() + tune.cameraHeight.get()}px)`,
       }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -293,7 +318,7 @@ export function Rolodex({ items, onFlick, exhale = 0 }: RolodexProps) {
         className="absolute inset-0"
         style={{
           transformStyle: 'preserve-3d',
-          originY: `calc(100% - ${AXLE}px)`,
+          originY: `calc(100% - ${tune.axle.get()}px)`,
           rotateX: drumTilt,
           y: breath,
         }}
@@ -318,10 +343,15 @@ function FileCard({ card, index, count, offset, register }: FileCardProps) {
   const ref = useRef<HTMLDivElement>(null)
   const dragX = useMotionValue(0)
   const dragY = useMotionValue(0)
+  const armed = useMotionValue(0)
+  const scale = useTransform(armed, (a) => 1 + a * 0.04)
   useTune()
 
   const d = useTransform(() => wrap(index - offset.get(), count))
   const rotateX = useTransform(() => angleFor(d.get()))
+  // Cards behind stand a step taller, like index tabs, so their tops show
+  // above the front card.
+  const y = useTransform(() => dragY.get() - tune.peek.get() * clamp(d.get(), 0, 4))
   // Cards further back sit in the drum's shadow.
   const shade = useTransform(d, (v) => (v > 0 ? Math.min(0.6, v * 0.14) : 0))
   // Fade before the loop wraps a card from the far front to the far back.
@@ -331,16 +361,16 @@ function FileCard({ card, index, count, offset, register }: FileCardProps) {
   const hub = tune.hubRadius.get()
 
   useEffect(() => {
-    register(card.id, { dragX, dragY, el: ref.current })
+    register(card.id, { dragX, dragY, armed, el: ref.current })
     return () => register(card.id, null)
-  }, [card.id, register, dragX, dragY])
+  }, [card.id, register, dragX, dragY, armed])
 
   // Opacity would flatten the 3D, so it goes on the two faces, not the card.
   return (
     <motion.div
       className="absolute left-1/2"
       style={{
-        bottom: AXLE + hub,
+        bottom: tune.axle.get() + hub,
         width: ROLODEX_W,
         height: ROLODEX_H,
         marginLeft: -ROLODEX_W / 2,
@@ -348,7 +378,8 @@ function FileCard({ card, index, count, offset, register }: FileCardProps) {
         originY: `${ROLODEX_H + hub}px`,
         transformStyle: 'preserve-3d',
         x: dragX,
-        y: dragY,
+        y,
+        scale,
         rotateX,
         display,
       }}
@@ -356,18 +387,18 @@ function FileCard({ card, index, count, offset, register }: FileCardProps) {
       <motion.div
         ref={ref}
         data-card-id={card.id}
-        className="absolute inset-0 rounded-[12px] [transform-style:preserve-3d]"
+        className="absolute inset-0 rounded-[14px] [transform-style:preserve-3d]"
         initial={{ y: 80 }}
         animate={{ y: 0 }}
         transition={{ type: 'spring', visualDuration: 0.45, bounce: 0.2 }}
       >
-        <motion.div className="absolute inset-0 rounded-[12px] [backface-visibility:hidden]" style={{ opacity: fade }}>
+        <motion.div className="absolute inset-0 rounded-[14px] [backface-visibility:hidden]" style={{ opacity: fade }}>
           <CardFace card={card} />
-          <motion.div className="pointer-events-none absolute inset-0 rounded-[12px] bg-black" style={{ opacity: shade }} />
+          <motion.div className="pointer-events-none absolute inset-0 rounded-[14px] bg-black" style={{ opacity: shade }} />
         </motion.div>
         {/* The back, seen on cards that have flipped forward. */}
         <motion.div
-          className="absolute inset-0 rounded-[12px] border border-white/10 bg-neutral-900 [backface-visibility:hidden] [transform:rotateX(180deg)]"
+          className="absolute inset-0 rounded-[14px] border border-white/10 bg-neutral-900 [backface-visibility:hidden] [transform:rotateX(180deg)]"
           style={{ opacity: fade }}
         >
           <div className="absolute inset-x-0 top-5 h-7 bg-black/60" />
