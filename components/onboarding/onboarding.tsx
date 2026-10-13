@@ -70,25 +70,39 @@ function useViewport() {
   return size
 }
 
+// Inside the desktop preview's phone frame there's no real safe area, so the
+// page pretends to be an iPhone's: status bar on top, home indicator below.
+// Layouts read --safe-top/--safe-bottom and fall back to the real insets.
+if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('embed')) {
+  document.documentElement.style.setProperty('--safe-top', '62px')
+  document.documentElement.style.setProperty('--safe-bottom', '34px')
+}
+
 // How far the overlay reaches below the screen's bottom edge: deeper than
 // Safari's toolbar, so whatever it covers is still the onboarding.
 const BLEED = 160
 
-// The glass comes in along this curve, from nothing at the top of the fade to
-// full strength at the button's top edge. It's flat at both ends, so there's
-// no line where the glass starts or where it levels off; CSS gradients are
-// linear between stops, so the curve is sampled into many of them.
-const glassEase = cubicBezier(0.45, 0, 0.55, 1)
+// The glass comes in along a cubic-bezier (tune: Glass), from nothing at the
+// top of the fade to full strength at the button's top edge. The default is
+// flat at both ends, so there's no line where the glass starts or where it
+// levels off. CSS gradients are linear between stops, so the curve is sampled
+// into many of them.
 const GLASS_STOPS = 24
 // Blur each layer adds. Stacked blurs compound (about the square root of the
 // sum of squares), so these build 1, 2, 3.5, 5, 7 and 9px in roughly even
 // visible steps. A little saturation per layer adds up to about 1.8x.
 const GLASS_BLURS = [1, 1.75, 2.9, 3.6, 4.9, 5.7]
 
+function glassEase() {
+  const ease = cubicBezier(tune.glassX1.get(), tune.glassY1.get(), tune.glassX2.get(), tune.glassY2.get())
+  return (t: number) => Math.min(1, Math.max(0, ease(t)))
+}
+
 function easedStops(fade: number, value: (amount: number) => string) {
+  const ease = glassEase()
   return Array.from({ length: GLASS_STOPS + 1 }, (_, i) => {
     const t = i / GLASS_STOPS
-    return `${value(glassEase(t))} ${(t * fade).toFixed(2)}px`
+    return `${value(ease(t))} ${(t * fade).toFixed(2)}px`
   }).join(', ')
 }
 
@@ -307,7 +321,7 @@ export function Onboarding() {
             />
           </motion.div>
 
-          <div className="mx-auto flex h-full max-w-md flex-col px-4 pt-[env(safe-area-inset-top)]">
+          <div className="mx-auto flex h-full max-w-md flex-col px-4 pt-[var(--safe-top,env(safe-area-inset-top))]">
             {/* The title sits up top: 16 above it, 32 tall. Leaving is quieter
                 than arriving: a quick fade, no movement. */}
             <motion.header
@@ -340,11 +354,12 @@ export function Onboarding() {
               fades out above, built from stacked blurs that each start a
               little lower, so the drum softens gradually as it turns under
               it. Each layer fades itself in: opacity on a shared parent would
-              switch off the blur. Add rises onto it with the first card. */}
+              switch off the blur. It arrives with the first card, under Add
+              (or from the start, with tune: Glass before the first card). */}
           <AnimatePresence>
-            {phase === 'pick' && (
+            {phase === 'pick' && (picked.length > 0 || tune.glassOnLoad.get() === 1) && (
               <motion.div
-                className="pointer-events-none absolute inset-x-0 z-20 px-4 pb-[max(24px,env(safe-area-inset-bottom))]"
+                className="pointer-events-none absolute inset-x-0 z-20 px-4 pb-[max(24px,var(--safe-bottom,env(safe-area-inset-bottom)))]"
                 style={{ bottom: BLEED, paddingTop: glassFade }}
                 initial="hidden"
                 animate="shown"

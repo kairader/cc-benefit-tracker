@@ -67,7 +67,7 @@ export function HomeView({ cards, intro, found }: HomeViewProps) {
 
   if (!mounted) {
     return (
-      <main className="min-h-screen bg-neutral-950 px-4 pb-8 pt-[max(32px,calc(env(safe-area-inset-top)+16px))]">
+      <main className="min-h-screen bg-neutral-950 px-4 pb-8 pt-[max(32px,calc(var(--safe-top,env(safe-area-inset-top))+16px))]">
         <div className="max-w-md mx-auto">
           <div className="h-8 bg-neutral-800 rounded w-48 mb-12" />
         </div>
@@ -78,7 +78,7 @@ export function HomeView({ cards, intro, found }: HomeViewProps) {
   const hidden = intro === 'hidden'
 
   return (
-    <main className="min-h-screen bg-neutral-950 px-4 pb-8 pt-[max(32px,calc(env(safe-area-inset-top)+16px))]">
+    <main className="min-h-screen bg-neutral-950 px-4 pb-8 pt-[max(32px,calc(var(--safe-top,env(safe-area-inset-top))+16px))]">
       <div className="max-w-md mx-auto">
         {/* Only the onboarding reveals the screen; ordinary opens show it at once. */}
         <header className="mb-12">

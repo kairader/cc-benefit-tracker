@@ -32,8 +32,6 @@ const defs = {
   catch: { group: 'Rolodex', label: 'Catch before falling', value: 0.15, min: 0, max: 0.5, step: 0.01, hint: 'share of a flip the card holds on the rail' },
   loosen: { group: 'Rolodex', label: 'Loosen on fast flips', value: 0.6, min: 0, max: 2, step: 0.05, hint: 'degrees of fan per card per second' },
   clickSound: { group: 'Rolodex', label: 'Click sound', value: 1, min: 0, max: 1, step: 1 },
-  glassShade: { group: 'Rolodex', label: 'Glass shade', value: 0.4, min: 0, max: 0.8, step: 0.05, hint: 'how much the bottom glass darkens the cards' },
-  glassFade: { group: 'Rolodex', label: 'Glass fade', value: 64, min: 16, max: 240, step: 4, hint: 'px above the button the glass eases in over' },
   hubRadius: { group: 'Rolodex', label: 'Drum radius', value: 16, min: 0, max: 120, step: 4 },
   backStep: { group: 'Rolodex', label: 'Lean between cards', value: 8, min: 2, max: 20, step: 0.5, hint: 'degrees, cards behind the front one' },
   backGap: { group: 'Rolodex', label: 'Gap behind front card', value: 3, min: 0, max: 20, step: 0.5, hint: 'degrees' },
@@ -42,6 +40,15 @@ const defs = {
   camera: { group: 'Rolodex', label: 'Perspective', value: 900, min: 300, max: 2400, step: 20, hint: 'px; lower is more dramatic' },
   cameraHeight: { group: 'Rolodex', label: 'Eye height', value: 600, min: 0, max: 1200, step: 10, hint: 'px above the axle' },
   tilt: { group: 'Rolodex', label: 'Drum tilt', value: 0, min: -40, max: 40, step: 1, hint: 'degrees; negative tips it toward you' },
+
+  // Glass
+  glassOnLoad: { group: 'Glass', label: 'Glass before the first card', value: 0, min: 0, max: 1, step: 1 },
+  glassShade: { group: 'Glass', label: 'Shade', value: 0.4, min: 0, max: 0.8, step: 0.05, hint: 'how much the glass darkens the cards' },
+  glassFade: { group: 'Glass', label: 'Fade height', value: 64, min: 16, max: 240, step: 4, hint: 'px above the button the glass eases in over' },
+  glassX1: { group: 'Glass', label: 'Curve x1', value: 0.45, min: 0, max: 1, step: 0.01 },
+  glassY1: { group: 'Glass', label: 'Curve y1', value: 0, min: 0, max: 1, step: 0.01 },
+  glassX2: { group: 'Glass', label: 'Curve x2', value: 0.55, min: 0, max: 1, step: 0.01 },
+  glassY2: { group: 'Glass', label: 'Curve y2', value: 1, min: 0, max: 1, step: 0.01, hint: 'cubic-bezier the fade follows, top of the fade to full strength' },
 
   // Hand
   radius: { group: 'Hand', label: 'Arc radius', value: 240, min: 160, max: 1400, step: 10 },
@@ -99,13 +106,35 @@ export const tune = Object.fromEntries(
 
 let version = 0
 const listeners = new Set<() => void>()
+// Set while taking values from another page, so they aren't written back
+// (two pages echoing each other's half-applied changes would undo a Reset).
+let following = false
 for (const value of Object.values(tune)) {
   value.on('change', () => {
     version++
     listeners.forEach((l) => l())
+    if (following) return
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(changedValues()))
     } catch {}
+  })
+}
+
+// Another page on this site changed the values (the desktop preview's panel
+// driving the phone inside it, or a second tab): follow along.
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key !== STORAGE_KEY) return
+    let next: Partial<Record<TuneKey, number>> = {}
+    try {
+      next = JSON.parse(e.newValue ?? '{}')
+    } catch {}
+    following = true
+    for (const key of Object.keys(params) as TuneKey[]) tune[key].set(next[key] ?? params[key].value)
+    following = false
+  })
+  window.addEventListener('message', (e) => {
+    if (e.origin === window.location.origin && e.data?.type === 'benny-speed') setTimeScale(Number(e.data.value) || 1)
   })
 }
 
