@@ -100,16 +100,17 @@ export function Onboarding() {
   // ?fan shows the earlier fanned hand instead of the rolodex.
   const [fan] = useState(() => new URLSearchParams(window.location.search).has('fan'))
   useTune()
-  const navRef = useRef<HTMLElement>(null)
-  const [navBottom, setNavBottom] = useState(44)
+  const topRef = useRef<HTMLDivElement>(null)
+  const [topEdge, setTopEdge] = useState(0)
   const viewport = useViewport()
 
   // Loading stack centre, snapped to the 4px grid.
   const stackY = Math.round((viewport.h * 0.36) / 4) * 4
 
-  // The nav bar's height depends on the safe area, which only the layout knows.
+  // The top of the usable screen depends on the safe area, which only the
+  // layout knows.
   useLayoutEffect(() => {
-    const measure = () => setNavBottom(navRef.current?.getBoundingClientRect().bottom ?? 44)
+    const measure = () => setTopEdge(topRef.current?.getBoundingClientRect().bottom ?? 0)
     measure()
   }, [viewport])
 
@@ -175,7 +176,7 @@ export function Onboarding() {
     spreadSpot(
       index,
       count,
-      { top: navBottom + tune.titleGap.get(), centerX: viewport.w / 2 },
+      { top: topEdge + tune.titleGap.get(), centerX: viewport.w / 2 },
       {
         cardH: CARD_H * pileScale,
         step: tune.spacing.get(),
@@ -291,17 +292,8 @@ export function Onboarding() {
           </motion.div>
 
           <div className="mx-auto flex h-full max-w-md flex-col px-4 pt-[env(safe-area-inset-top)]">
-            {/* The title sits up top: 16 above it, 32 tall. Leaving is quieter
-                than arriving: a quick fade, no movement. */}
-            <motion.header
-              ref={navRef}
-              className="flex h-12 shrink-0 items-end justify-center"
-              initial={{ opacity: 0, filter: 'blur(4px)' }}
-              animate={phase === 'pick' ? { opacity: 1, filter: 'blur(0px)' } : { opacity: 0, filter: 'blur(2px)' }}
-              transition={phase === 'pick' ? { duration: 0.4, ease: 'easeOut' } : { duration: 0.2, ease: EASE_OUT }}
-            >
-              <h1 className="flex h-8 items-center text-xl font-medium text-white">Add your cards</h1>
-            </motion.header>
+            {/* Marks the top of the usable screen, under the status bar. */}
+            <div ref={topRef} aria-hidden className="shrink-0" />
 
             <motion.div
               className="relative flex-1"
@@ -317,15 +309,17 @@ export function Onboarding() {
 
           </div>
 
-          {/* Add, pinned to the bottom of the screen on a sheet of glass that
-              runs to the left, right and bottom edges, and on under Safari's
-              toolbar. The glass is at full strength behind the button and
-              fades out above it, built from stacked blurs that each start a
+          {/* A sheet of glass along the bottom of the screen, there from the
+              start. It runs to the left, right and bottom edges, and on under
+              Safari's toolbar. It's at full strength across the bottom and
+              fades out above, built from stacked blurs that each start a
               little lower, so the drum softens gradually as it turns under
               it. Each layer fades itself in: opacity on a shared parent would
-              switch off the blur. */}
+              switch off the blur.
+              The title sits on the glass until the first card is pulled, then
+              hands its place to Add. */}
           <AnimatePresence>
-            {phase === 'pick' && picked.length > 0 && (
+            {phase === 'pick' && (
               <motion.div
                 className="pointer-events-none absolute inset-x-0 z-20 px-4 pb-[max(24px,env(safe-area-inset-bottom))]"
                 style={{ bottom: BLEED, paddingTop: GLASS_FADE }}
@@ -349,19 +343,54 @@ export function Onboarding() {
                     transition={{ duration: 0.3, ease: EASE_OUT }}
                   />
                 ))}
-                <motion.button
-                  type="button"
-                  onClick={() => setPhase('loading')}
-                  variants={{
-                    hidden: { opacity: 0, y: 40, scale: 0.96 },
-                    shown: { opacity: 1, y: 0, scale: 1 },
+                {/* A dark wash in the same fade, so white type stays readable
+                    over the light cards (Gold, Platinum, Strata). */}
+                <motion.div
+                  aria-hidden
+                  className="absolute inset-x-0 top-0"
+                  style={{
+                    bottom: -BLEED,
+                    background: `linear-gradient(to bottom, rgb(10 10 10 / 0) 0px, rgb(10 10 10 / ${tune.glassShade.get()}) ${GLASS_FADE}px)`,
                   }}
-                  whileTap={{ scale: 0.97 }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                  className="pointer-events-auto relative mx-auto block h-12 w-full max-w-md rounded-full bg-white text-base font-medium tabular-nums text-neutral-950"
-                >
-                  Add {picked.length} {picked.length === 1 ? 'card' : 'cards'}
-                </motion.button>
+                  variants={{ hidden: { opacity: 0 }, shown: { opacity: 1 } }}
+                  transition={{ duration: 0.3, ease: EASE_OUT }}
+                />
+                <div className="relative mx-auto h-12 max-w-md">
+                  <AnimatePresence>
+                    {picked.length === 0 ? (
+                      <motion.h1
+                        key="title"
+                        className="absolute inset-0 flex items-center justify-center text-xl font-medium text-white"
+                        variants={{
+                          hidden: { opacity: 0, filter: 'blur(4px)' },
+                          shown: { opacity: 1, filter: 'blur(0px)' },
+                        }}
+                        exit={{ opacity: 0, filter: 'blur(4px)', transition: { duration: 0.2, ease: EASE_OUT } }}
+                        transition={{ duration: 0.4, ease: 'easeOut' }}
+                      >
+                        Add your cards
+                      </motion.h1>
+                    ) : (
+                      <motion.button
+                        key="add"
+                        type="button"
+                        onClick={() => setPhase('loading')}
+                        variants={{
+                          hidden: { opacity: 0, y: 40, scale: 0.96 },
+                          shown: { opacity: 1, y: 0, scale: 1 },
+                        }}
+                        initial="hidden"
+                        animate="shown"
+                        exit="hidden"
+                        whileTap={{ scale: 0.97 }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                        className="pointer-events-auto relative block h-12 w-full rounded-full bg-white text-base font-medium tabular-nums text-neutral-950"
+                      >
+                        Add {picked.length} {picked.length === 1 ? 'card' : 'cards'}
+                      </motion.button>
+                    )}
+                  </AnimatePresence>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
