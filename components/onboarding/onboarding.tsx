@@ -69,6 +69,20 @@ function useViewport() {
   return size
 }
 
+// How far above the button the glass fades out, and the blurs it's built
+// from: each layer is a little stronger and reaches full strength a little
+// lower, so together they ramp from nothing at the top to the full glass at
+// the button's top edge.
+const GLASS_FADE = 64
+const GLASS = [1, 2, 4, 8].map((blur, i, all) => {
+  const from = (GLASS_FADE * i) / all.length
+  const to = (GLASS_FADE * (i + 1)) / all.length
+  return {
+    filter: i === all.length - 1 ? `blur(${blur}px) saturate(1.8)` : `blur(${blur}px)`,
+    mask: `linear-gradient(to bottom, transparent ${from}px, black ${to}px)`,
+  }
+})
+
 export function Onboarding() {
   const [phase, setPhase] = useState<Phase>('pick')
   const [picked, setPicked] = useState<Picked[]>([])
@@ -289,27 +303,46 @@ export function Onboarding() {
 
           </div>
 
-          {/* Add, pinned to the bottom in a clear glass capsule that floats
-              over the drum, so the cards keep turning behind it. The capsule
-              stops short of the screen edge: Safari tints its toolbar from
-              whatever fixed element touches the bottom, and that should stay
-              the dark page rather than the white button. The fade lives on
-              the capsule itself, since opacity on a parent switches off its
-              backdrop blur. */}
+          {/* Add, pinned to the bottom of the screen on a sheet of glass that
+              runs to the left, right and bottom edges. The glass is at full
+              strength behind the button and fades out above it, built from
+              stacked blurs that each start a little lower, so the drum
+              softens gradually as it turns under it. Each layer fades itself
+              in: opacity on a shared parent would switch off the blur. */}
           <AnimatePresence>
             {phase === 'pick' && picked.length > 0 && (
               <motion.div
-                className="pointer-events-none fixed inset-x-2 bottom-[max(16px,calc(env(safe-area-inset-bottom)-8px))] z-20 mx-auto max-w-[464px] rounded-full border border-white/15 bg-white/[0.06] p-2 shadow-[inset_0_1px_0_rgb(255_255_255/0.3),inset_0_-1px_0_rgb(255_255_255/0.08),inset_0_0_16px_rgb(255_255_255/0.06)] backdrop-blur-[6px] backdrop-saturate-[1.8]"
-                initial={{ opacity: 0, y: 40, scale: 0.96 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 20, scale: 0.96 }}
-                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                className="pointer-events-none fixed inset-x-0 bottom-0 z-20 px-4 pb-[max(24px,env(safe-area-inset-bottom))]"
+                style={{ paddingTop: GLASS_FADE }}
+                initial="hidden"
+                animate="shown"
+                exit="hidden"
               >
+                {GLASS.map((layer, i) => (
+                  <motion.div
+                    key={i}
+                    aria-hidden
+                    className="absolute inset-0"
+                    style={{
+                      backdropFilter: layer.filter,
+                      WebkitBackdropFilter: layer.filter,
+                      maskImage: layer.mask,
+                      WebkitMaskImage: layer.mask,
+                    }}
+                    variants={{ hidden: { opacity: 0 }, shown: { opacity: 1 } }}
+                    transition={{ duration: 0.3, ease: EASE_OUT }}
+                  />
+                ))}
                 <motion.button
                   type="button"
                   onClick={() => setPhase('loading')}
+                  variants={{
+                    hidden: { opacity: 0, y: 40, scale: 0.96 },
+                    shown: { opacity: 1, y: 0, scale: 1 },
+                  }}
                   whileTap={{ scale: 0.97 }}
-                  className="pointer-events-auto h-12 w-full rounded-full bg-white text-base font-medium tabular-nums text-neutral-950"
+                  transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                  className="pointer-events-auto relative mx-auto block h-12 w-full max-w-md rounded-full bg-white text-base font-medium tabular-nums text-neutral-950"
                 >
                   Add {picked.length} {picked.length === 1 ? 'card' : 'cards'}
                 </motion.button>
