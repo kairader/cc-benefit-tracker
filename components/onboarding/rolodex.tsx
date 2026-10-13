@@ -1,9 +1,19 @@
 'use client'
 
-import { animate, motion, useMotionValue, useTransform, type MotionValue, type Transition } from 'framer-motion'
+import {
+  animate,
+  motion,
+  useMotionValue,
+  useSpring,
+  useTransform,
+  useVelocity,
+  type MotionValue,
+  type Transition,
+} from 'framer-motion'
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import type { HandCard } from '@/lib/demo-cards'
 import { CardFace } from './card-face'
+import { click, primeClick } from './click'
 import { CARD_W, type FlickOrigin } from './card-fan'
 import { fx, reducedMotion, tune, useTune } from './tune'
 
@@ -30,10 +40,16 @@ const smoothstep = (t: number) => t * t * (3 - 2 * t)
 const wrap = (d: number, n: number) => ((((d + n / 2) % n) + n) % n) - n / 2
 
 // How far a card leans back (positive) or has fallen forward (negative).
-function angleFor(d: number) {
-  if (d >= 0) return tune.backGap.get() * smoothstep(clamp(d, 0, 1)) + d * tune.backStep.get()
-  const fallen = -d
-  return -(tune.flop.get() * smoothstep(clamp(fallen, 0, 1)) + Math.max(0, fallen - 1) * tune.frontStep.get())
+// Falling, it catches on the rail at first, barely tipping, then lets go and
+// drops faster and faster, like a card under gravity.
+function angleFor(d: number, loose = 0) {
+  if (d >= 0) return tune.backGap.get() * smoothstep(clamp(d, 0, 1)) + d * tune.backStep.get() + loose * clamp(d, 0, 4)
+  const fallen = clamp(-d, 0, 1)
+  const hold = tune.catch.get()
+  const bend = 3
+  const drop =
+    fallen < hold ? (bend * fallen) / hold : bend + (tune.flop.get() - bend) * ((fallen - hold) / (1 - hold)) ** 2
+  return -(drop + Math.max(0, -d - 1) * tune.frontStep.get())
 }
 
 // UIKit-style projection of where a released value would come to rest.
@@ -61,8 +77,10 @@ export function Rolodex({ items, onFlick, exhale = 0 }: RolodexProps) {
   const offset = useMotionValue(Math.max(0, items.findIndex((c) => c.cardId)))
   const handles = useRef(new Map<string, Handle>())
   const prevItems = useRef(items)
-  // A small kick in the drum each time a card snaps past the front.
+  // A small kick in the drum each time a card snaps past the front, and a
+  // bump in the card that just fell as it lands on the stack.
   const tick = useMotionValue(0)
+  const thump = useMotionValue(0)
   const breath = useMotionValue(0)
   const gesture = useRef<{
     id: number
@@ -84,16 +102,28 @@ export function Rolodex({ items, onFlick, exhale = 0 }: RolodexProps) {
     return ((Math.round(offset.get()) % n) + n) % n
   }
 
+  // A card lands each time the drum crosses a whole card.
   useEffect(() => {
-    let last = Math.round(offset.get())
+    let last = Math.floor(offset.get())
     return offset.on('change', (v) => {
-      const now = Math.round(v)
+      const now = Math.floor(v)
       if (now === last) return
+      const forward = now > last
       last = now
+      if (tune.clickSound.get()) click()
       const strength = fx('tick')
-      if (strength > 0) animate(tick, 0, { type: 'spring', velocity: strength * 12, stiffness: 700, damping: 22 })
+      if (!strength) return
+      animate(tick, 0, { type: 'spring', velocity: strength * 12, stiffness: 700, damping: 22 })
+      if (forward) animate(thump, 0, { type: 'spring', velocity: strength * 50, stiffness: 600, damping: 18 })
     })
-  }, [offset, tick])
+  }, [offset, tick, thump])
+
+  // Flipped fast, the cards behind loosen and fan apart, then pack closed.
+  const offsetVelocity = useVelocity(offset)
+  const loose = useSpring(
+    useTransform(() => (reducedMotion.get() ? 0 : clamp(Math.abs(offsetVelocity.get()) * tune.loosen.get(), 0, 6))),
+    { stiffness: 220, damping: 26 },
+  )
 
   // A two-part hint on arrival, one for each direction: the front card rises
   // partway out of the file and drops back, then the file starts to flip
@@ -167,6 +197,7 @@ export function Rolodex({ items, onFlick, exhale = 0 }: RolodexProps) {
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (gesture.current) return
     touched.current = true
+    primeClick()
     e.currentTarget.setPointerCapture(e.pointerId)
     const hit = (e.target as HTMLElement).closest<HTMLElement>('[data-card-id]')?.dataset.cardId
     const cardId = hit && items.some((c) => c.id === hit) ? hit : null
@@ -324,7 +355,16 @@ export function Rolodex({ items, onFlick, exhale = 0 }: RolodexProps) {
         }}
       >
         {items.map((card, index) => (
-          <FileCard key={card.id} card={card} index={index} count={items.length} offset={offset} register={register} />
+          <FileCard
+            key={card.id}
+            card={card}
+            index={index}
+            count={items.length}
+            offset={offset}
+            loose={loose}
+            thump={thump}
+            register={register}
+          />
         ))}
       </motion.div>
     </div>
@@ -336,10 +376,12 @@ interface FileCardProps {
   index: number
   count: number
   offset: MotionValue<number>
+  loose: MotionValue<number>
+  thump: MotionValue<number>
   register: (id: string, handle: Handle | null) => void
 }
 
-function FileCard({ card, index, count, offset, register }: FileCardProps) {
+function FileCard({ card, index, count, offset, loose, thump, register }: FileCardProps) {
   const ref = useRef<HTMLDivElement>(null)
   const dragX = useMotionValue(0)
   const dragY = useMotionValue(0)
@@ -348,17 +390,32 @@ function FileCard({ card, index, count, offset, register }: FileCardProps) {
   useTune()
 
   const d = useTransform(() => wrap(index - offset.get(), count))
-  const rotateX = useTransform(() => angleFor(d.get()))
+  // The card that just fell takes the landing bump.
+  const rotateX = useTransform(
+    () => angleFor(d.get(), loose.get()) - thump.get() * clamp(1 - Math.abs(d.get() + 1), 0, 1),
+  )
   // Cards behind stand a step taller, like index tabs, so their tops show
   // above the front card.
   const y = useTransform(() => dragY.get() - tune.peek.get() * clamp(d.get(), 0, 4))
-  // Cards further back sit in the drum's shadow.
-  const shade = useTransform(d, (v) => (v > 0 ? Math.min(0.6, v * 0.14) : 0))
+  // Light comes from above. Cards further back sit in the drum's shadow, and a
+  // card falling forward turns its face away from the light.
+  const shade = useTransform(() => {
+    const v = d.get()
+    if (v > 0) return Math.min(0.6, v * 0.14)
+    return clamp(-rotateX.get() / tune.flop.get(), 0, 1) * 0.5
+  })
+  // A highlight slides down the face as the card turns through the light.
+  const sheen = useTransform(d, (v) => Math.sin(Math.PI * clamp(Math.abs(v), 0, 1)) * 0.9)
+  const sheenAt = useTransform(rotateX, (a) => `0% ${clamp(50 - a * 1.2, 0, 100)}%`)
+  // Where the card in front covers this one, its edge casts a soft band of
+  // contact shade just under the visible tab.
+  const contact = useTransform(d, (v) => clamp(v, 0, 1))
   // Fade before the loop wraps a card from the far front to the far back.
   // Only the last few flipped cards show, so the front of the file stays quiet.
   const fade = useTransform(d, (v) => clamp((v < 0 ? 3.5 : 5) - Math.abs(v), 0, 1) * clamp((count / 2 - Math.abs(v)) * 2, 0, 1))
   const display = useTransform(fade, (v) => (v > 0 ? 'block' : 'none'))
   const hub = tune.hubRadius.get()
+  const peek = tune.peek.get()
 
   useEffect(() => {
     register(card.id, { dragX, dragY, armed, el: ref.current })
@@ -394,7 +451,20 @@ function FileCard({ card, index, count, offset, register }: FileCardProps) {
       >
         <motion.div className="absolute inset-0 rounded-[14px] [backface-visibility:hidden]" style={{ opacity: fade }}>
           <CardFace card={card} />
+          <motion.div
+            className="pointer-events-none absolute inset-0 rounded-[14px]"
+            style={{
+              opacity: contact,
+              background: `linear-gradient(to bottom, transparent ${peek - 12}px, rgb(0 0 0 / 0.55) ${peek + 6}px, rgb(0 0 0 / 0.55))`,
+            }}
+          />
           <motion.div className="pointer-events-none absolute inset-0 rounded-[14px] bg-black" style={{ opacity: shade }} />
+          <motion.div
+            className="pointer-events-none absolute inset-0 rounded-[14px] bg-[linear-gradient(170deg,transparent_38%,rgb(255_255_255/0.28)_50%,transparent_62%)] bg-[length:100%_400%] mix-blend-screen"
+            style={{ opacity: sheen, backgroundPosition: sheenAt }}
+          />
+          {/* Card stock: a thin lit top edge. */}
+          <div className="pointer-events-none absolute inset-0 rounded-[14px] shadow-[inset_0_1px_0_rgb(255_255_255/0.35),inset_0_-1px_0_rgb(0_0_0/0.3)]" />
         </motion.div>
         {/* The back, seen on cards that have flipped forward. */}
         <motion.div

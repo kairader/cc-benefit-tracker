@@ -168,12 +168,6 @@ export function Onboarding() {
       },
     )
   const nextSpot = spotFor(picked.length, picked.length + 1)
-  // Add sits centred a set gap under the lowest card on the table (counting
-  // the landing spot), snapped to the 4px grid.
-  const tableBottom = Math.max(
-    ...Array.from({ length: picked.length + 1 }, (_, i) => spotFor(i, picked.length + 1).y),
-  ) + (CARD_H * pileScale) / 2
-  const addTop = Math.ceil((tableBottom + 24) / 4) * 4
 
   const targetFor = (index: number, origin: FlickOrigin, at: Phase = phase): Target => {
     const base = { width: CARD_W, height: CARD_H, radius: 12, faceOpacity: 1, opacity: 1, deal: false }
@@ -295,36 +289,33 @@ export function Onboarding() {
 
           </div>
 
-          {/* Add, under the table. It follows the landing spot down when a new
-              row starts, on the same beat. */}
-          <motion.div
-            className="absolute left-0 top-0 z-20"
-            initial={false}
-            animate={{ x: viewport.w / 2, y: addTop }}
-            transition={{
-              type: 'spring',
-              visualDuration: 0.4,
-              bounce: 0,
-              delay: picked.length ? tune.flightDuration.get() * 0.6 : 0,
-            }}
-          >
-            <AnimatePresence>
-              {phase === 'pick' && picked.length > 0 && (
+          {/* Add, pinned to the bottom in a clear glass capsule that floats
+              over the drum, so the cards keep turning behind it. The capsule
+              stops short of the screen edge: Safari tints its toolbar from
+              whatever fixed element touches the bottom, and that should stay
+              the dark page rather than the white button. The fade lives on
+              the capsule itself, since opacity on a parent switches off its
+              backdrop blur. */}
+          <AnimatePresence>
+            {phase === 'pick' && picked.length > 0 && (
+              <motion.div
+                className="pointer-events-none fixed inset-x-2 bottom-[max(16px,calc(env(safe-area-inset-bottom)-8px))] z-20 mx-auto max-w-[464px] rounded-full border border-white/15 bg-white/[0.06] p-2 shadow-[inset_0_1px_0_rgb(255_255_255/0.3),inset_0_-1px_0_rgb(255_255_255/0.08),inset_0_0_16px_rgb(255_255_255/0.06)] backdrop-blur-[6px] backdrop-saturate-[1.8]"
+                initial={{ opacity: 0, y: 40, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 20, scale: 0.96 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+              >
                 <motion.button
                   type="button"
                   onClick={() => setPhase('loading')}
-                  initial={{ opacity: 0, scale: 0.8, filter: 'blur(4px)' }}
-                  animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-                  exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.15 } }}
-                  whileTap={{ scale: 0.94 }}
-                  transition={{ type: 'spring', stiffness: 500, damping: 30, delay: picked.length === 1 ? tune.flightDuration.get() * 0.6 : 0 }}
-                  className="h-8 -translate-x-1/2 rounded-full bg-white px-4 text-base font-medium tabular-nums text-neutral-950"
+                  whileTap={{ scale: 0.97 }}
+                  className="pointer-events-auto h-12 w-full rounded-full bg-white text-base font-medium tabular-nums text-neutral-950"
                 >
-                  Add {picked.length}
+                  Add {picked.length} {picked.length === 1 ? 'card' : 'cards'}
                 </motion.button>
-              )}
-            </AnimatePresence>
-          </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <AnimatePresence>
             {(phase === 'loading' || phase === 'landing') && (
