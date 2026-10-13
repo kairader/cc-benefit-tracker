@@ -267,12 +267,12 @@ export function Onboarding() {
                 than arriving: a quick fade, no movement. */}
             <motion.header
               ref={navRef}
-              className="relative flex h-12 shrink-0 items-end justify-center"
+              className="relative flex h-12 shrink-0 items-end"
               initial={{ opacity: 0, filter: 'blur(4px)' }}
               animate={phase === 'pick' ? { opacity: 1, filter: 'blur(0px)' } : { opacity: 0, filter: 'blur(2px)' }}
               transition={phase === 'pick' ? { duration: 0.4, ease: 'easeOut' } : { duration: 0.2, ease: EASE_OUT }}
             >
-              <h1 className="text-2xl font-medium text-white">Add your cards</h1>
+              <h1 className="flex h-8 items-center text-xl font-medium text-white">Add your cards</h1>
               {/* The trailing nav bar action, on the title's line. */}
               <AnimatePresence>
                 {phase === 'pick' && picked.length > 0 && (

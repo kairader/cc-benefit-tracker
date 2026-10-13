@@ -27,7 +27,7 @@ const defs = {
 
   // Rolodex
   flipDistance: { group: 'Rolodex', label: 'Drag per card', value: 64, min: 24, max: 160, step: 4, hint: 'px of drag to flip one card' },
-  axle: { group: 'Rolodex', label: 'Axle height', value: -40, min: -200, max: 200, step: 4, hint: 'px above the screen bottom; below zero crops the cards' },
+  axle: { group: 'Rolodex', label: 'Axle height', value: -88, min: -200, max: 200, step: 4, hint: 'px above the screen bottom; below zero crops the cards' },
   peek: { group: 'Rolodex', label: 'Card tops showing', value: 28, min: 0, max: 40, step: 1, hint: 'px each card behind stands above the one in front' },
   hubRadius: { group: 'Rolodex', label: 'Drum radius', value: 16, min: 0, max: 120, step: 4 },
   backStep: { group: 'Rolodex', label: 'Lean between cards', value: 8, min: 2, max: 20, step: 0.5, hint: 'degrees, cards behind the front one' },
@@ -70,7 +70,7 @@ const defs = {
   perRow: { group: 'Deal', label: 'Cards per row', value: 5, min: 2, max: 6, step: 1 },
   scatter: { group: 'Deal', label: 'Scatter', value: 4, min: 0, max: 12, step: 0.5, hint: 'turns and nudges, degrees' },
   toss: { group: 'Deal', label: 'Toss height', value: 0.1, min: 0, max: 0.4, step: 0.01, hint: 'how much it lifts off the table mid-flight' },
-  titleGap: { group: 'Deal', label: 'Gap below title', value: 32, min: 8, max: 160, step: 4 },
+  titleGap: { group: 'Deal', label: 'Gap below title', value: 40, min: 8, max: 160, step: 4 },
 } satisfies Record<string, Omit<Param, 'value'> & { value: number }>
 
 export type TuneKey = keyof typeof defs
