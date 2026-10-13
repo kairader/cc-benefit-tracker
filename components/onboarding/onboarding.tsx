@@ -3,6 +3,7 @@
 import {
   animate,
   AnimatePresence,
+  cubicBezier,
   motion,
   useMotionValue,
   useTransform,
@@ -69,22 +70,37 @@ function useViewport() {
   return size
 }
 
-// How far above the button the glass fades out, and the blurs it's built
-// from: each layer is a little stronger and reaches full strength a little
-// lower, so together they ramp from nothing at the top to the full glass at
-// the button's top edge.
-const GLASS_FADE = 64
 // How far the overlay reaches below the screen's bottom edge: deeper than
 // Safari's toolbar, so whatever it covers is still the onboarding.
 const BLEED = 160
-const GLASS = [1, 2, 4, 8].map((blur, i, all) => {
-  const from = (GLASS_FADE * i) / all.length
-  const to = (GLASS_FADE * (i + 1)) / all.length
-  return {
-    filter: i === all.length - 1 ? `blur(${blur}px) saturate(1.8)` : `blur(${blur}px)`,
-    mask: `linear-gradient(to bottom, transparent ${from}px, black ${to}px)`,
-  }
-})
+
+// The glass comes in along this curve, from nothing at the top of the fade to
+// full strength at the button's top edge. It's flat at both ends, so there's
+// no line where the glass starts or where it levels off; CSS gradients are
+// linear between stops, so the curve is sampled into many of them.
+const glassEase = cubicBezier(0.45, 0, 0.55, 1)
+const GLASS_STOPS = 24
+// Blur each layer adds. Stacked blurs compound (about the square root of the
+// sum of squares), so these build 1, 2, 3.5, 5, 7 and 9px in roughly even
+// visible steps. A little saturation per layer adds up to about 1.8x.
+const GLASS_BLURS = [1, 1.75, 2.9, 3.6, 4.9, 5.7]
+
+function easedStops(fade: number, value: (amount: number) => string) {
+  return Array.from({ length: GLASS_STOPS + 1 }, (_, i) => {
+    const t = i / GLASS_STOPS
+    return `${value(glassEase(t))} ${(t * fade).toFixed(2)}px`
+  }).join(', ')
+}
+
+// Each layer takes its own slice of the curve, so the stack thickens one
+// layer at a time and the total follows the curve exactly.
+function glassLayers(fade: number) {
+  const n = GLASS_BLURS.length
+  return GLASS_BLURS.map((blur, k) => ({
+    filter: `blur(${blur}px) saturate(1.1)`,
+    mask: `linear-gradient(to bottom, ${easedStops(fade, (e) => `rgb(0 0 0 / ${Math.min(1, Math.max(0, e * n - k)).toFixed(3)})`)})`,
+  }))
+}
 
 export function Onboarding() {
   const [phase, setPhase] = useState<Phase>('pick')
@@ -100,17 +116,16 @@ export function Onboarding() {
   // ?fan shows the earlier fanned hand instead of the rolodex.
   const [fan] = useState(() => new URLSearchParams(window.location.search).has('fan'))
   useTune()
-  const topRef = useRef<HTMLDivElement>(null)
-  const [topEdge, setTopEdge] = useState(0)
+  const navRef = useRef<HTMLElement>(null)
+  const [navBottom, setNavBottom] = useState(44)
   const viewport = useViewport()
 
   // Loading stack centre, snapped to the 4px grid.
   const stackY = Math.round((viewport.h * 0.36) / 4) * 4
 
-  // The top of the usable screen depends on the safe area, which only the
-  // layout knows.
+  // The nav bar's height depends on the safe area, which only the layout knows.
   useLayoutEffect(() => {
-    const measure = () => setTopEdge(topRef.current?.getBoundingClientRect().bottom ?? 0)
+    const measure = () => setNavBottom(navRef.current?.getBoundingClientRect().bottom ?? 44)
     measure()
   }, [viewport])
 
@@ -172,11 +187,12 @@ export function Onboarding() {
 
   // The table starts a set gap under the nav bar and grows down toward the hand.
   const pileScale = tune.pileScale.get()
+  const glassFade = tune.glassFade.get()
   const spotFor = (index: number, count: number) =>
     spreadSpot(
       index,
       count,
-      { top: topEdge + tune.titleGap.get(), centerX: viewport.w / 2 },
+      { top: navBottom + tune.titleGap.get(), centerX: viewport.w / 2 },
       {
         cardH: CARD_H * pileScale,
         step: tune.spacing.get(),
@@ -292,8 +308,17 @@ export function Onboarding() {
           </motion.div>
 
           <div className="mx-auto flex h-full max-w-md flex-col px-4 pt-[env(safe-area-inset-top)]">
-            {/* Marks the top of the usable screen, under the status bar. */}
-            <div ref={topRef} aria-hidden className="shrink-0" />
+            {/* The title sits up top: 16 above it, 32 tall. Leaving is quieter
+                than arriving: a quick fade, no movement. */}
+            <motion.header
+              ref={navRef}
+              className="flex h-12 shrink-0 items-end justify-center"
+              initial={{ opacity: 0, filter: 'blur(4px)' }}
+              animate={phase === 'pick' ? { opacity: 1, filter: 'blur(0px)' } : { opacity: 0, filter: 'blur(2px)' }}
+              transition={phase === 'pick' ? { duration: 0.4, ease: 'easeOut' } : { duration: 0.2, ease: EASE_OUT }}
+            >
+              <h1 className="flex h-8 items-center text-xl font-medium text-white">Add your cards</h1>
+            </motion.header>
 
             <motion.div
               className="relative flex-1"
@@ -315,19 +340,17 @@ export function Onboarding() {
               fades out above, built from stacked blurs that each start a
               little lower, so the drum softens gradually as it turns under
               it. Each layer fades itself in: opacity on a shared parent would
-              switch off the blur.
-              The title sits on the glass until the first card is pulled, then
-              hands its place to Add. */}
+              switch off the blur. Add rises onto it with the first card. */}
           <AnimatePresence>
             {phase === 'pick' && (
               <motion.div
                 className="pointer-events-none absolute inset-x-0 z-20 px-4 pb-[max(24px,env(safe-area-inset-bottom))]"
-                style={{ bottom: BLEED, paddingTop: GLASS_FADE }}
+                style={{ bottom: BLEED, paddingTop: glassFade }}
                 initial="hidden"
                 animate="shown"
                 exit="hidden"
               >
-                {GLASS.map((layer, i) => (
+                {glassLayers(glassFade).map((layer, i) => (
                   <motion.div
                     key={i}
                     aria-hidden
@@ -343,36 +366,22 @@ export function Onboarding() {
                     transition={{ duration: 0.3, ease: EASE_OUT }}
                   />
                 ))}
-                {/* A dark wash in the same fade, so white type stays readable
-                    over the light cards (Gold, Platinum, Strata). */}
+                {/* A dark wash on the same curve, so white stays readable over
+                    the light cards (Gold, Platinum, Strata). */}
                 <motion.div
                   aria-hidden
                   className="absolute inset-x-0 top-0"
                   style={{
                     bottom: -BLEED,
-                    background: `linear-gradient(to bottom, rgb(10 10 10 / 0) 0px, rgb(10 10 10 / ${tune.glassShade.get()}) ${GLASS_FADE}px)`,
+                    background: `linear-gradient(to bottom, ${easedStops(glassFade, (e) => `rgb(10 10 10 / ${(e * tune.glassShade.get()).toFixed(3)})`)})`,
                   }}
                   variants={{ hidden: { opacity: 0 }, shown: { opacity: 1 } }}
                   transition={{ duration: 0.3, ease: EASE_OUT }}
                 />
                 <div className="relative mx-auto h-12 max-w-md">
                   <AnimatePresence>
-                    {picked.length === 0 ? (
-                      <motion.h1
-                        key="title"
-                        className="absolute inset-0 flex items-center justify-center text-xl font-medium text-white"
-                        variants={{
-                          hidden: { opacity: 0, filter: 'blur(4px)' },
-                          shown: { opacity: 1, filter: 'blur(0px)' },
-                        }}
-                        exit={{ opacity: 0, filter: 'blur(4px)', transition: { duration: 0.2, ease: EASE_OUT } }}
-                        transition={{ duration: 0.4, ease: 'easeOut' }}
-                      >
-                        Add your cards
-                      </motion.h1>
-                    ) : (
+                    {picked.length > 0 && (
                       <motion.button
-                        key="add"
                         type="button"
                         onClick={() => setPhase('loading')}
                         variants={{
@@ -384,7 +393,7 @@ export function Onboarding() {
                         exit="hidden"
                         whileTap={{ scale: 0.97 }}
                         transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                        className="pointer-events-auto relative block h-12 w-full rounded-full bg-white text-base font-medium tabular-nums text-neutral-950"
+                        className="pointer-events-auto block h-12 w-full rounded-full bg-white text-base font-medium tabular-nums text-neutral-950"
                       >
                         Add {picked.length} {picked.length === 1 ? 'card' : 'cards'}
                       </motion.button>

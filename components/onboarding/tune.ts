@@ -33,6 +33,7 @@ const defs = {
   loosen: { group: 'Rolodex', label: 'Loosen on fast flips', value: 0.6, min: 0, max: 2, step: 0.05, hint: 'degrees of fan per card per second' },
   clickSound: { group: 'Rolodex', label: 'Click sound', value: 1, min: 0, max: 1, step: 1 },
   glassShade: { group: 'Rolodex', label: 'Glass shade', value: 0.4, min: 0, max: 0.8, step: 0.05, hint: 'how much the bottom glass darkens the cards' },
+  glassFade: { group: 'Rolodex', label: 'Glass fade', value: 64, min: 16, max: 240, step: 4, hint: 'px above the button the glass eases in over' },
   hubRadius: { group: 'Rolodex', label: 'Drum radius', value: 16, min: 0, max: 120, step: 4 },
   backStep: { group: 'Rolodex', label: 'Lean between cards', value: 8, min: 2, max: 20, step: 0.5, hint: 'degrees, cards behind the front one' },
   backGap: { group: 'Rolodex', label: 'Gap behind front card', value: 3, min: 0, max: 20, step: 0.5, hint: 'degrees' },
@@ -74,7 +75,7 @@ const defs = {
   perRow: { group: 'Deal', label: 'Cards per row', value: 5, min: 2, max: 6, step: 1 },
   scatter: { group: 'Deal', label: 'Scatter', value: 4, min: 0, max: 12, step: 0.5, hint: 'turns and nudges, degrees' },
   toss: { group: 'Deal', label: 'Toss height', value: 0.1, min: 0, max: 0.4, step: 0.01, hint: 'how much it lifts off the table mid-flight' },
-  titleGap: { group: 'Deal', label: 'Gap from top', value: 40, min: 8, max: 160, step: 4 },
+  titleGap: { group: 'Deal', label: 'Gap below title', value: 40, min: 8, max: 160, step: 4 },
 } satisfies Record<string, Omit<Param, 'value'> & { value: number }>
 
 export type TuneKey = keyof typeof defs
