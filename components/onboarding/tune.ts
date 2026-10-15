@@ -27,14 +27,14 @@ const defs = {
 
   // Rolodex
   flipDistance: { group: 'Rolodex', label: 'Drag per card', value: 64, min: 24, max: 160, step: 4, hint: 'px of drag to flip one card' },
-  axle: { group: 'Rolodex', label: 'Axle height', value: -88, min: -200, max: 200, step: 4, hint: 'px above the screen bottom; below zero crops the cards' },
-  peek: { group: 'Rolodex', label: 'Card tops showing', value: 28, min: 0, max: 40, step: 1, hint: 'px each card behind stands above the one in front' },
+  axle: { group: 'Rolodex', label: 'Axle height', value: -40, min: -200, max: 200, step: 4, hint: 'px above the screen bottom; below zero crops the cards' },
+  peek: { group: 'Rolodex', label: 'Card tops showing', value: 32, min: 0, max: 40, step: 1, hint: 'px each card behind stands above the one in front' },
   catch: { group: 'Rolodex', label: 'Catch before falling', value: 0.15, min: 0, max: 0.5, step: 0.01, hint: 'share of a flip the card holds on the rail' },
   loosen: { group: 'Rolodex', label: 'Loosen on fast flips', value: 0.6, min: 0, max: 2, step: 0.05, hint: 'degrees of fan per card per second' },
   clickSound: { group: 'Rolodex', label: 'Click sound', value: 1, min: 0, max: 1, step: 1 },
   hubRadius: { group: 'Rolodex', label: 'Drum radius', value: 16, min: 0, max: 120, step: 4 },
   backStep: { group: 'Rolodex', label: 'Lean between cards', value: 8, min: 2, max: 20, step: 0.5, hint: 'degrees, cards behind the front one' },
-  backGap: { group: 'Rolodex', label: 'Gap behind front card', value: 3, min: 0, max: 20, step: 0.5, hint: 'degrees' },
+  backGap: { group: 'Rolodex', label: 'Gap behind front card', value: 0, min: 0, max: 20, step: 0.5, hint: 'degrees' },
   flop: { group: 'Rolodex', label: 'Fall of flipped card', value: 66, min: 30, max: 110, step: 1, hint: 'degrees' },
   frontStep: { group: 'Rolodex', label: 'Lean of flipped cards', value: 6, min: 0, max: 20, step: 0.5, hint: 'degrees' },
   camera: { group: 'Rolodex', label: 'Perspective', value: 900, min: 300, max: 2400, step: 20, hint: 'px; lower is more dramatic' },
