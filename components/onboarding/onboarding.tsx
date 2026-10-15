@@ -14,6 +14,7 @@ import { cards, type Benefit, type Card } from '@/lib/cards'
 import { hand, type HandCard } from '@/lib/demo-cards'
 import { AnimatedNumber } from '@/components/animated-number'
 import { HomeView } from '@/components/home-view'
+import { SafariEdges } from '@/components/safari-edges'
 import { CardFace } from './card-face'
 import { CardFan, CARD_H, CARD_W, type FlickOrigin } from './card-fan'
 import { Rolodex } from './rolodex'
@@ -480,6 +481,9 @@ export function Onboarding() {
             onLand={() => handleLand(i)}
           />
         ))}
+
+      {/* The bottom stays clear while the drum runs under Safari's toolbar. */}
+      <SafariEdges bottom={!showOverlay} />
 
       {tuning && <TunePanel />}
     </>
