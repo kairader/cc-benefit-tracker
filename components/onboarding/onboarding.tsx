@@ -20,7 +20,7 @@ import { CardFan, CARD_H, CARD_W, type FlickOrigin } from './card-fan'
 import { Rolodex } from './rolodex'
 import { fx, reducedMotion, tune, useTune } from './tune'
 import { TunePanel } from './tune-panel'
-import { spreadSpot, stackSpot } from './spread'
+import { overlapSpot, rowSpot, spreadSpot, stackSpot } from './spread'
 
 type Phase = 'pick' | 'loading' | 'landing' | 'home'
 
@@ -34,6 +34,8 @@ interface Picked {
 
 // Makes the front card 320 wide, so the stack's edges land on the 4px grid.
 const STACK_SCALE = 320 / CARD_W
+// The landing layouts, in the order the tuning panel lists them.
+const LAYOUTS = ['row', 'overlap', 'stack', 'angled'] as const
 const LOADING_MS = 1700
 
 const EASE_OUT = [0.22, 1, 0.36, 1] as const
@@ -200,31 +202,45 @@ export function Onboarding() {
     return () => clearTimeout(timer)
   }, [phase, picked.length])
 
-  // Dealt cards stack a set gap under the nav bar and grow down toward the drum.
-  const oldSpread = tune.oldSpread.get() === 1
-  const pileScale = oldSpread ? tune.pileScale.get() : tune.stackWidth.get() / CARD_W
+  // Dealt cards gather a set gap under the nav bar, in the layout chosen in
+  // the tuning panel. The row keeps a place open for the next card, so its
+  // empty slot is always part of the layout.
+  const layout = LAYOUTS[tune.landing.get()] ?? 'row'
+  const cardWidth = {
+    row: tune.rowWidth.get(),
+    overlap: tune.overlapWidth.get(),
+    stack: tune.stackWidth.get(),
+    angled: tune.pileScale.get() * CARD_W,
+  }[layout]
+  const pileScale = cardWidth / CARD_W
   const glassFade = tune.glassFade.get()
   const zone = { top: navBottom + tune.titleGap.get(), centerX: viewport.w / 2 }
-  const spotFor = (index: number, count: number) =>
-    oldSpread
-      ? spreadSpot(index, count, zone, {
-          cardH: CARD_H * pileScale,
+  const cardH = CARD_H * pileScale
+  const spotFor = (index: number, count: number) => {
+    switch (layout) {
+      case 'row':
+        return rowSpot(index, count, zone, { cardW: cardWidth, cardH, gap: tune.rowGap.get(), perRow: 3 })
+      case 'overlap':
+        return overlapSpot(index, count, zone, { cardW: cardWidth, cardH, step: tune.overlapStep.get(), maxWidth: viewport.w - 32 })
+      case 'stack':
+        return stackSpot(index, count, zone, { cardH, peek: tune.stackPeek.get(), bottom: viewport.h - tune.stackRoom.get() })
+      case 'angled':
+        return spreadSpot(index, count, zone, {
+          cardH,
           step: tune.spacing.get(),
           rowStep: tune.rowStep.get(),
           perRow: tune.perRow.get(),
           scatter: fx('scatter'),
         })
-      : stackSpot(index, count, zone, {
-          cardH: CARD_H * pileScale,
-          peek: tune.stackPeek.get(),
-          bottom: viewport.h - tune.stackRoom.get(),
-        })
+    }
+  }
+  const laidOut = layout === 'row' ? picked.length + 1 : picked.length
   const nextSpot = spotFor(picked.length, picked.length + 1)
 
   const targetFor = (index: number, origin: FlickOrigin, at: Phase = phase): Target => {
     const base = { width: CARD_W, height: CARD_H, radius: 12, faceOpacity: 1, opacity: 1, deal: false }
     if (at === 'pick') {
-      const spot = spotFor(index, picked.length)
+      const spot = spotFor(index, laidOut)
       return {
         ...base,
         ...spot,
@@ -238,7 +254,7 @@ export function Onboarding() {
       const n = picked.length
       const fromTop = n - 1 - index
       // The stack squares up as it grows into the middle; the old spread fans.
-      const fan = oldSpread ? index - (n - 1) / 2 : 0
+      const fan = layout === 'angled' ? index - (n - 1) / 2 : 0
       return {
         ...base,
         x: viewport.w / 2 + fan * 8,
@@ -305,7 +321,7 @@ export function Onboarding() {
           animate={{ backgroundColor: phase === 'landing' ? 'rgba(10,10,10,0)' : 'rgba(10,10,10,1)' }}
           transition={{ duration: 0.4 }}
         >
-          {oldSpread ? (
+          {layout === 'angled' ? (
             // The old spread's marker: a card-shaped outline with a soft
             // neutral glow at the next spot. It slides on once the card
             // heading for it arrives.
@@ -328,24 +344,34 @@ export function Onboarding() {
               />
             </motion.div>
           ) : (
-            // Where the stack will start: an empty card-shaped slot, a hairline
-            // and a faint fill, with no glow (light is kept for the home
-            // screen, where it stands for money). Once the first card covers
-            // it, the stack itself is the target and the slot goes.
+            // An empty card-shaped slot: a hairline and a faint fill, with no
+            // glow (light is kept for the home screen, where it stands for
+            // money). In the row it waits at the next place and moves on once
+            // the card heading for it arrives. Elsewhere it marks where the
+            // first card goes, and after that the cards themselves are the
+            // target.
             <motion.div
               aria-hidden
-              className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 border border-white/10 bg-white/[0.03]"
-              style={{
-                left: nextSpot.x,
-                top: spotFor(0, 1).y,
-                width: CARD_W * pileScale,
-                height: CARD_H * pileScale,
-                borderRadius: 12 * pileScale,
-              }}
+              className="pointer-events-none absolute left-0 top-0"
               initial={false}
-              animate={{ opacity: phase === 'pick' && picked.length === 0 ? 1 : 0 }}
-              transition={{ duration: 0.2, delay: picked.length ? tune.flightDuration.get() : 0 }}
-            />
+              animate={{
+                x: nextSpot.x,
+                y: layout === 'row' ? nextSpot.y : spotFor(0, 1).y,
+                opacity: phase === 'pick' && (layout === 'row' || picked.length === 0) ? 1 : 0,
+              }}
+              transition={{
+                type: 'spring',
+                visualDuration: 0.4,
+                bounce: 0,
+                delay: picked.length ? tune.flightDuration.get() * 0.6 : 0,
+                opacity: { duration: 0.2, delay: layout === 'row' || !picked.length ? 0 : tune.flightDuration.get() },
+              }}
+            >
+              <div
+                className="-translate-x-1/2 -translate-y-1/2 border border-white/10 bg-white/[0.03]"
+                style={{ width: CARD_W * pileScale, height: CARD_H * pileScale, borderRadius: 12 * pileScale }}
+              />
+            </motion.div>
           )}
 
           <div className="mx-auto flex h-full max-w-md flex-col px-4 pt-[var(--safe-top,env(safe-area-inset-top))]">

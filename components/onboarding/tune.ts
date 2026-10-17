@@ -15,6 +15,8 @@ interface Param {
   max: number
   step: number
   hint?: string
+  // Named choices: the value is the index of the chosen one.
+  options?: string[]
 }
 
 const defs = {
@@ -76,10 +78,14 @@ const defs = {
   // Deal
   flightDuration: { group: 'Deal', label: 'Flight time', value: 0.42, min: 0.2, max: 0.9, step: 0.02, hint: 'seconds from hand to stack' },
   overshoot: { group: 'Deal', label: 'Landing overshoot', value: 1.3, min: 1, max: 1.8, step: 0.05, hint: '1 lands dead; higher sails past and settles back' },
+  landing: { group: 'Deal', label: 'Layout', value: 0, min: 0, max: 3, step: 1, options: ['Row', 'Overlap', 'Stack', 'Angled'], hint: 'Angled is the earlier spread with the glowing outline' },
+  rowWidth: { group: 'Deal', label: 'Card width in row', value: 112, min: 64, max: 160, step: 4 },
+  rowGap: { group: 'Deal', label: 'Gap between cards in row', value: 12, min: 4, max: 32, step: 4 },
+  overlapWidth: { group: 'Deal', label: 'Card width in overlap', value: 160, min: 96, max: 240, step: 4 },
+  overlapStep: { group: 'Deal', label: 'Card edges showing in overlap', value: 48, min: 16, max: 120, step: 4, hint: 'px of each card left of the one on top; tightens to fit the screen' },
   stackWidth: { group: 'Deal', label: 'Card width in stack', value: 264, min: 160, max: 360, step: 4 },
-  stackPeek: { group: 'Deal', label: 'Card tops showing in stack', value: 44, min: 12, max: 64, step: 4, hint: 'px of each card above the one in front, like the rolodex tabs' },
+  stackPeek: { group: 'Deal', label: 'Card tops showing in stack', value: 44, min: 12, max: 64, step: 4, hint: 'px of each card above the one in front' },
   stackRoom: { group: 'Deal', label: 'Room kept for the drum', value: 360, min: 200, max: 560, step: 4, hint: 'px up from the screen bottom the stack stays above; tops tighten to fit' },
-  oldSpread: { group: 'Deal', label: 'Angled spread (old)', value: 0, min: 0, max: 1, step: 1, hint: 'the earlier rows of small turned cards and glowing outline, to compare' },
   pileScale: { group: 'Deal', label: 'Card size in spread', value: 0.44, min: 0.25, max: 0.7, step: 0.01, hint: 'angled spread only' },
   spacing: { group: 'Deal', label: 'Card spacing', value: 52, min: 24, max: 90, step: 1, hint: 'angled spread only' },
   rowStep: { group: 'Deal', label: 'Row spacing', value: 40, min: 30, max: 120, step: 2, hint: 'angled spread only' },

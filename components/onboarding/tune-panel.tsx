@@ -123,6 +123,29 @@ export function TuneControls({
               const value = tune[key].get()
               const changed = value !== p.value
               const toggle = p.min === 0 && p.max === 1 && p.step === 1
+              if (p.options) {
+                return (
+                  <div key={key} className="py-1">
+                    <span className={changed ? 'text-white' : 'text-neutral-400'}>
+                      {changed && <span className="mr-1 inline-block h-1 w-1 rounded-full bg-sky-400 align-middle" />}
+                      {p.label}
+                    </span>
+                    <div className="mt-1 flex gap-1">
+                      {p.options.map((option, i) => (
+                        <button
+                          key={option}
+                          type="button"
+                          onClick={() => tune[key].set(i)}
+                          className={`flex-1 rounded-full px-2 py-1 ${value === i ? 'bg-white text-neutral-950' : 'bg-white/10'}`}
+                        >
+                          {option}
+                        </button>
+                      ))}
+                    </div>
+                    {p.hint && <span className="block pt-1 text-[11px] text-neutral-500">{p.hint}</span>}
+                  </div>
+                )
+              }
               return (
                 <label key={key} className="block py-1">
                   <span className="flex items-baseline gap-2">
