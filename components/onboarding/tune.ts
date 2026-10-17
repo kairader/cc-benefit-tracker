@@ -74,13 +74,17 @@ const defs = {
   snapBackBounce: { group: 'Flick', label: 'Drop-back bounce', value: 0.3, min: 0, max: 0.6, step: 0.02 },
 
   // Deal
-  flightDuration: { group: 'Deal', label: 'Flight time', value: 0.42, min: 0.2, max: 0.9, step: 0.02, hint: 'seconds from hand to spread' },
+  flightDuration: { group: 'Deal', label: 'Flight time', value: 0.42, min: 0.2, max: 0.9, step: 0.02, hint: 'seconds from hand to stack' },
   overshoot: { group: 'Deal', label: 'Landing overshoot', value: 1.3, min: 1, max: 1.8, step: 0.05, hint: '1 lands dead; higher sails past and settles back' },
-  pileScale: { group: 'Deal', label: 'Card size in spread', value: 0.44, min: 0.25, max: 0.7, step: 0.01 },
-  spacing: { group: 'Deal', label: 'Card spacing', value: 52, min: 24, max: 90, step: 1 },
-  rowStep: { group: 'Deal', label: 'Row spacing', value: 40, min: 30, max: 120, step: 2 },
-  perRow: { group: 'Deal', label: 'Cards per row', value: 5, min: 2, max: 6, step: 1 },
-  scatter: { group: 'Deal', label: 'Scatter', value: 4, min: 0, max: 12, step: 0.5, hint: 'turns and nudges, degrees' },
+  stackWidth: { group: 'Deal', label: 'Card width in stack', value: 264, min: 160, max: 360, step: 4 },
+  stackPeek: { group: 'Deal', label: 'Card tops showing in stack', value: 44, min: 12, max: 64, step: 4, hint: 'px of each card above the one in front, like the rolodex tabs' },
+  stackRoom: { group: 'Deal', label: 'Room kept for the drum', value: 360, min: 200, max: 560, step: 4, hint: 'px up from the screen bottom the stack stays above; tops tighten to fit' },
+  oldSpread: { group: 'Deal', label: 'Angled spread (old)', value: 0, min: 0, max: 1, step: 1, hint: 'the earlier rows of small turned cards and glowing outline, to compare' },
+  pileScale: { group: 'Deal', label: 'Card size in spread', value: 0.44, min: 0.25, max: 0.7, step: 0.01, hint: 'angled spread only' },
+  spacing: { group: 'Deal', label: 'Card spacing', value: 52, min: 24, max: 90, step: 1, hint: 'angled spread only' },
+  rowStep: { group: 'Deal', label: 'Row spacing', value: 40, min: 30, max: 120, step: 2, hint: 'angled spread only' },
+  perRow: { group: 'Deal', label: 'Cards per row', value: 5, min: 2, max: 6, step: 1, hint: 'angled spread only' },
+  scatter: { group: 'Deal', label: 'Scatter', value: 4, min: 0, max: 12, step: 0.5, hint: 'angled spread only: turns and nudges, degrees' },
   toss: { group: 'Deal', label: 'Toss height', value: 0.1, min: 0, max: 0.4, step: 0.01, hint: 'how much it lifts off the table mid-flight' },
   titleGap: { group: 'Deal', label: 'Gap below title', value: 40, min: 8, max: 160, step: 4 },
 } satisfies Record<string, Omit<Param, 'value'> & { value: number }>

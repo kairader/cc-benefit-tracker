@@ -20,7 +20,7 @@ import { CardFan, CARD_H, CARD_W, type FlickOrigin } from './card-fan'
 import { Rolodex } from './rolodex'
 import { fx, reducedMotion, tune, useTune } from './tune'
 import { TunePanel } from './tune-panel'
-import { spreadSpot } from './spread'
+import { spreadSpot, stackSpot } from './spread'
 
 type Phase = 'pick' | 'loading' | 'landing' | 'home'
 
@@ -200,22 +200,25 @@ export function Onboarding() {
     return () => clearTimeout(timer)
   }, [phase, picked.length])
 
-  // The table starts a set gap under the nav bar and grows down toward the hand.
-  const pileScale = tune.pileScale.get()
+  // Dealt cards stack a set gap under the nav bar and grow down toward the drum.
+  const oldSpread = tune.oldSpread.get() === 1
+  const pileScale = oldSpread ? tune.pileScale.get() : tune.stackWidth.get() / CARD_W
   const glassFade = tune.glassFade.get()
+  const zone = { top: navBottom + tune.titleGap.get(), centerX: viewport.w / 2 }
   const spotFor = (index: number, count: number) =>
-    spreadSpot(
-      index,
-      count,
-      { top: navBottom + tune.titleGap.get(), centerX: viewport.w / 2 },
-      {
-        cardH: CARD_H * pileScale,
-        step: tune.spacing.get(),
-        rowStep: tune.rowStep.get(),
-        perRow: tune.perRow.get(),
-        scatter: fx('scatter'),
-      },
-    )
+    oldSpread
+      ? spreadSpot(index, count, zone, {
+          cardH: CARD_H * pileScale,
+          step: tune.spacing.get(),
+          rowStep: tune.rowStep.get(),
+          perRow: tune.perRow.get(),
+          scatter: fx('scatter'),
+        })
+      : stackSpot(index, count, zone, {
+          cardH: CARD_H * pileScale,
+          peek: tune.stackPeek.get(),
+          bottom: viewport.h - tune.stackRoom.get(),
+        })
   const nextSpot = spotFor(picked.length, picked.length + 1)
 
   const targetFor = (index: number, origin: FlickOrigin, at: Phase = phase): Target => {
@@ -234,12 +237,14 @@ export function Onboarding() {
     if (at === 'loading') {
       const n = picked.length
       const fromTop = n - 1 - index
+      // The stack squares up as it grows into the middle; the old spread fans.
+      const fan = oldSpread ? index - (n - 1) / 2 : 0
       return {
         ...base,
-        x: viewport.w / 2 + (index - (n - 1) / 2) * 8,
+        x: viewport.w / 2 + fan * 8,
         y: stackY - fromTop * 12,
         scale: STACK_SCALE - fromTop * 0.05,
-        rotate: (index - (n - 1) / 2) * 4,
+        rotate: fan * 4,
         radius: 16,
         spring: same({ type: 'spring', stiffness: 200, damping: 24, delay: index * 0.05 }),
       }
@@ -300,27 +305,48 @@ export function Onboarding() {
           animate={{ backgroundColor: phase === 'landing' ? 'rgba(10,10,10,0)' : 'rgba(10,10,10,1)' }}
           transition={{ duration: 0.4 }}
         >
-          {/* Where the next card will land: a card-shaped outline with a soft
-              neutral glow, like the home screen's glow bars. It slides on
-              once the card heading for it arrives. */}
-          <motion.div
-            aria-hidden
-            className="pointer-events-none absolute left-0 top-0"
-            initial={false}
-            animate={{ x: nextSpot.x, y: nextSpot.y, rotate: nextSpot.rotate, opacity: phase === 'pick' ? 1 : 0 }}
-            transition={{
-              type: 'spring',
-              visualDuration: 0.4,
-              bounce: 0,
-              delay: picked.length ? tune.flightDuration.get() * 0.6 : 0,
-              opacity: { duration: 0.2 },
-            }}
-          >
-            <div
-              className="animate-breathe -translate-x-1/2 -translate-y-1/2 rounded-[5px] border border-white/40 shadow-[0_0_6px_1px_rgb(255_255_255/0.3),0_0_20px_4px_rgb(255_255_255/0.12),inset_0_0_12px_rgb(255_255_255/0.1)]"
-              style={{ width: CARD_W * pileScale, height: CARD_H * pileScale }}
+          {oldSpread ? (
+            // The old spread's marker: a card-shaped outline with a soft
+            // neutral glow at the next spot. It slides on once the card
+            // heading for it arrives.
+            <motion.div
+              aria-hidden
+              className="pointer-events-none absolute left-0 top-0"
+              initial={false}
+              animate={{ x: nextSpot.x, y: nextSpot.y, rotate: nextSpot.rotate, opacity: phase === 'pick' ? 1 : 0 }}
+              transition={{
+                type: 'spring',
+                visualDuration: 0.4,
+                bounce: 0,
+                delay: picked.length ? tune.flightDuration.get() * 0.6 : 0,
+                opacity: { duration: 0.2 },
+              }}
+            >
+              <div
+                className="animate-breathe -translate-x-1/2 -translate-y-1/2 rounded-[5px] border border-white/40 shadow-[0_0_6px_1px_rgb(255_255_255/0.3),0_0_20px_4px_rgb(255_255_255/0.12),inset_0_0_12px_rgb(255_255_255/0.1)]"
+                style={{ width: CARD_W * pileScale, height: CARD_H * pileScale }}
+              />
+            </motion.div>
+          ) : (
+            // Where the stack will start: an empty card-shaped slot, a hairline
+            // and a faint fill, with no glow (light is kept for the home
+            // screen, where it stands for money). Once the first card covers
+            // it, the stack itself is the target and the slot goes.
+            <motion.div
+              aria-hidden
+              className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 border border-white/10 bg-white/[0.03]"
+              style={{
+                left: nextSpot.x,
+                top: spotFor(0, 1).y,
+                width: CARD_W * pileScale,
+                height: CARD_H * pileScale,
+                borderRadius: 12 * pileScale,
+              }}
+              initial={false}
+              animate={{ opacity: phase === 'pick' && picked.length === 0 ? 1 : 0 }}
+              transition={{ duration: 0.2, delay: picked.length ? tune.flightDuration.get() : 0 }}
             />
-          </motion.div>
+          )}
 
           <div className="mx-auto flex h-full max-w-md flex-col px-4 pt-[var(--safe-top,env(safe-area-inset-top))]">
             {/* The title sits up top: 16 above it, 32 tall. Leaving is quieter

@@ -1,8 +1,10 @@
-// Where dealt cards come to rest: a loose spread hanging just under the
-// title. Spots are designed rather than thrown, so
-// every take lands the same way. Each new card joins the row on the right and
-// the row re-centres; past a full row, a new row starts below,
-// covering only the bottoms of the cards above so their logos stay readable.
+// Where dealt cards come to rest. Spots are designed rather than thrown, so
+// every take lands the same way. The stack at the end of this file is the
+// layout; the angled spread is the earlier one, kept to compare (tune:
+// Angled spread). It hangs just under the title: each new card joins the row
+// on the right and the row re-centres; past a full row, a new row starts
+// below, covering only the bottoms of the cards above so their logos stay
+// readable.
 
 export interface Spot {
   x: number
@@ -37,5 +39,26 @@ export function spreadSpot(index: number, count: number, zone: Zone, o: SpreadOp
     x: zone.centerX + (col - (inRow - 1) / 2) * o.step,
     y: firstRowY + row * o.rowStep + (NUDGE[k] * o.scatter) / 4,
     rotate: (TURN[k] * o.scatter) / 4,
+  }
+}
+
+export interface StackOptions {
+  cardH: number
+  peek: number
+  // Lowest the stack's front card may reach, in screen px.
+  bottom: number
+}
+
+// The stack the dealt cards build, like cards in Wallet: square, centred
+// under the title, each new card in front of and a little below the last,
+// so every card's top edge and logo stays in view. With many cards the tops
+// tighten so the stack never reaches the drum.
+export function stackSpot(index: number, count: number, zone: Zone, o: StackOptions): Spot {
+  const room = o.bottom - zone.top - o.cardH
+  const peek = count > 1 ? Math.max(0, Math.min(o.peek, room / (count - 1))) : o.peek
+  return {
+    x: zone.centerX,
+    y: zone.top + o.cardH / 2 + index * peek,
+    rotate: 0,
   }
 }
