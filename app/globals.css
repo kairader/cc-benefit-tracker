@@ -24,28 +24,38 @@
   }
 }
 
-/* Page load fade-in animation */
+/* Home screen reveal at the end of the onboarding, in three weights: the
+   total materializes, card names rise a little, rows only fade. */
+@keyframes materialize {
+  from {
+    opacity: 0;
+    filter: blur(4px);
+  }
+}
+
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(8px);
-    filter: blur(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-    filter: blur(0px);
   }
 }
 
-.animate-fade-in {
-  animation: fadeIn 0.4s ease-out forwards;
+.reveal-total {
+  animation: materialize 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* Stagger animation for card sections */
-.animate-stagger {
-  opacity: 0;
-  animation: fadeIn 0.4s ease-out forwards;
+.reveal-name {
+  animation: riseIn 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.reveal-fade {
+  animation: fadeIn 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 /* Milestone celebration pulse */
@@ -74,4 +84,30 @@
 
 .animate-glow-pulse {
   animation: glowPulse 0.5s ease-in-out;
+}
+
+/* Slow breathing glow on the onboarding's landing spot */
+@keyframes breathe {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.animate-breathe {
+  animation: breathe 2.4s ease-in-out infinite;
+}
+
+/* Extra page height for the onboarding on iPhone only (see Onboarding). */
+.safari-runway {
+  display: none;
+}
+
+@supports (-webkit-touch-callout: none) {
+  .safari-runway {
+    display: block;
+    height: calc(100lvh + 160px);
+  }
 }

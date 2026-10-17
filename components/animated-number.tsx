@@ -1,7 +1,7 @@
 'use client'
 
 import { MotionValue, motion, useSpring, useTransform } from 'framer-motion'
-import { useEffect, useRef } from 'react'
+import { Fragment, useEffect, useRef } from 'react'
 
 interface AnimatedNumberProps {
   value: number
@@ -77,7 +77,10 @@ export function AnimatedNumber({ value, className = '', animateOnMount = false }
     <span className={`inline-flex tabular-nums ${className}`}>
       <span>$</span>
       {integerPlaces.map((place) => (
-        <Digit key={`int-${place}`} place={place} value={integerPart} animateOnMount={animateOnMount} />
+        <Fragment key={`int-${place}`}>
+          <Digit place={place} value={integerPart} animateOnMount={animateOnMount} />
+          {place >= 1000 && Math.round(Math.log10(place)) % 3 === 0 && <span>,</span>}
+        </Fragment>
       ))}
       {hasDecimals && (
         <>

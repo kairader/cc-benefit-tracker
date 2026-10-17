@@ -13,9 +13,10 @@ interface CardSectionProps {
   onToggleBenefit: (benefitId: string, period: string) => void
   index?: number
   celebrating?: boolean
+  intro?: 'hidden' | 'revealed'
 }
 
-export function CardSection({ card, usageState, onToggleBenefit, index = 0, celebrating = false }: CardSectionProps) {
+export function CardSection({ card, usageState, onToggleBenefit, index = 0, celebrating = false, intro }: CardSectionProps) {
   // Sort benefits: unused first, then used
   const sortedBenefits = [...card.benefits].sort((a, b) => {
     const aUsed = isBenefitUsed(a.id, getCurrentPeriod(a.cycle), usageState)
@@ -24,14 +25,24 @@ export function CardSection({ card, usageState, onToggleBenefit, index = 0, cele
     return aUsed ? 1 : -1
   })
 
+  // During the onboarding intro the glow bar is where the flying card lands,
+  // so it stays put while the name rises in and the benefits fade in after it.
+  // Ordinary opens skip the reveal.
+  const nameAt = 120 + index * 60
+  const reveal = (className: string, delay: number) =>
+    intro === 'hidden'
+      ? { className: 'opacity-0' }
+      : intro
+        ? { className, style: { animationDelay: `${delay}ms` } }
+        : {}
+  const name = reveal('reveal-name', nameAt)
+
   return (
-    <section
-      className="mb-8 animate-stagger"
-      style={{ animationDelay: `${100 + index * 75}ms` }}
-    >
+    <section className="mb-8">
       <div className="flex items-center py-2 mb-2">
         <div
-          className={`w-[3px] self-stretch rounded-full bg-white ${celebrating ? 'animate-glow-pulse' : ''}`}
+          data-glow-bar={card.id}
+          className={`w-1 self-stretch rounded-full bg-white ${celebrating ? 'animate-glow-pulse' : ''} ${intro === 'hidden' ? 'opacity-0' : ''}`}
           style={{
             boxShadow: `
               0 0 3px 1px ${card.glowColor},
@@ -41,16 +52,17 @@ export function CardSection({ card, usageState, onToggleBenefit, index = 0, cele
             `
           }}
         />
-        <h2 className="text-base font-semibold pl-3" style={{ color: card.textColor }}>{card.name}</h2>
+        <h2 className={`text-base font-medium pl-2 ${name.className ?? ''}`} style={{ color: card.textColor, ...name.style }}>{card.name}</h2>
       </div>
-      <div>
-        {sortedBenefits.map((benefit) => {
+      <div className={intro === 'hidden' ? 'opacity-0' : ''}>
+        {sortedBenefits.map((benefit, row) => {
           const period = getCurrentPeriod(benefit.cycle)
           const isUsed = isBenefitUsed(benefit.id, period, usageState)
 
           return (
             <motion.div
               key={benefit.id}
+              {...(intro === 'revealed' ? reveal('reveal-fade', nameAt + 40 + row * 30) : {})}
               layout
               initial={false}
               animate={{ opacity: 1 }}
