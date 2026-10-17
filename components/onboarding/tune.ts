@@ -78,7 +78,7 @@ const defs = {
   // Deal
   flightDuration: { group: 'Deal', label: 'Flight time', value: 0.42, min: 0.2, max: 0.9, step: 0.02, hint: 'seconds from hand to stack' },
   overshoot: { group: 'Deal', label: 'Landing overshoot', value: 1.3, min: 1, max: 1.8, step: 0.05, hint: '1 lands dead; higher sails past and settles back' },
-  landing: { group: 'Deal', label: 'Layout', value: 0, min: 0, max: 4, step: 1, options: ['Row', 'Overlap', 'Stack', 'Angled', 'Value'], hint: 'Angled is the earlier spread with the glowing outline. Value folds each card into a glow line under a running total' },
+  landing: { group: 'Deal', label: 'Layout', value: 4, min: 0, max: 4, step: 1, options: ['Row', 'Overlap', 'Stack', 'Angled', 'Value'], hint: 'Angled is the earlier spread with the glowing outline. Value folds each card into a glow line under a running total' },
   rowWidth: { group: 'Deal', label: 'Card width in row', value: 96, min: 64, max: 160, step: 4 },
   rowGap: { group: 'Deal', label: 'Gap between cards in row', value: 12, min: 4, max: 32, step: 4 },
   rowPerRow: { group: 'Deal', label: 'Cards per row', value: 3, min: 2, max: 4, step: 1, hint: 'Row only; cards shrink if a full row would not fit' },

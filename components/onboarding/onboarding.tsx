@@ -137,6 +137,7 @@ export function Onboarding() {
   // Where the loading total flies to: its place in the home header.
   const [counterTo, setCounterTo] = useState<{ x: number; y: number; scale: number } | null>(null)
   const counterRef = useRef<HTMLSpanElement>(null)
+  const valueTotalRef = useRef<HTMLSpanElement>(null)
   const caught = useRef(new Set<string>())
   const [tuning] = useState(() => new URLSearchParams(window.location.search).has('tune'))
   // ?fan shows the earlier fanned hand instead of the rolodex.
@@ -145,7 +146,7 @@ export function Onboarding() {
   // ?layout=value (or any layout's name) shows that layout whatever the
   // tuning panel says, so a prototype can be shared as a link.
   const [layoutParam] = useState(() => new URLSearchParams(window.location.search).get('layout'))
-  const layout: Layout = LAYOUTS.find((l) => l === layoutParam) ?? LAYOUTS[tune.landing.get()] ?? 'row'
+  const layout: Layout = LAYOUTS.find((l) => l === layoutParam) ?? LAYOUTS[tune.landing.get()] ?? 'value'
   const navRef = useRef<HTMLElement>(null)
   const [navBottom, setNavBottom] = useState(44)
   const viewport = useViewport()
@@ -193,7 +194,7 @@ export function Onboarding() {
         if (data && el) rects[data.id] = el.getBoundingClientRect()
       }
       setBarRects(rects)
-      const from = counterRef.current
+      const from = layout === 'value' ? valueTotalRef.current : counterRef.current
       const to = document.querySelector<HTMLElement>('[data-found-value]')
       if (from && to) {
         const a = from.getBoundingClientRect()
@@ -368,55 +369,69 @@ export function Onboarding() {
           {layout === 'value' && (
             // What the picks are worth: a running total, then a line per card
             // like the home screen's, each with its glow bar. The card lands
-            // as the bar; its name and value show once it has.
-            <motion.div
+            // as the bar; its name and value show once it has. On Add the
+            // lines fade, the bars carry on into the home screen's, and the
+            // total flies into the line under its headline.
+            <div
               aria-hidden={picked.length === 0}
               className="pointer-events-none absolute"
               style={{ left: valueLeft, right: valueLeft, top: zone.top }}
-              initial={false}
-              animate={{ opacity: phase === 'pick' ? 1 : 0 }}
-              transition={{ duration: 0.2 }}
             >
               <p
                 className="h-8 text-2xl font-medium tabular-nums transition-colors duration-300"
                 style={{ color: valueTotal ? 'rgb(255 255 255)' : 'rgb(115 115 115)' }}
               >
-                <AnimatedNumber value={Math.round(valueTotal)} />
+                <motion.span
+                  ref={valueTotalRef}
+                  className="inline-block"
+                  style={{ originX: 0, originY: 0 }}
+                  initial={false}
+                  animate={
+                    phase === 'landing' && counterTo
+                      ? { ...counterTo, color: 'rgb(161, 161, 161)' }
+                      : { x: 0, y: 0, scale: 1 }
+                  }
+                  transition={{ type: 'spring', visualDuration: 0.5, bounce: 0 }}
+                >
+                  <AnimatedNumber value={Math.round(valueTotal)} />
+                </motion.span>
               </p>
-              <p className="mt-1 h-5 text-sm text-neutral-400">in benefits a year</p>
-              <div className="mt-6">
-                {picked.map((p, i) => (
-                  <div key={p.card.id} className="flex items-center" style={{ height: valueLine }}>
-                    <motion.div
-                      className="h-6 w-1 shrink-0 rounded-full bg-white"
-                      style={{
-                        boxShadow: `0 0 3px 1px ${p.data?.glowColor ?? 'rgb(255 255 255 / 0.5)'}, 0 0 8px 2px ${p.data?.glowColor ?? 'rgb(255 255 255 / 0.3)'}`,
-                      }}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: i < settled ? 1 : 0 }}
-                      transition={{ duration: 0.3 }}
-                    />
-                    <motion.span
-                      className="truncate pl-2 text-base font-medium"
-                      style={{ color: p.data?.textColor ?? 'rgb(255 255 255)' }}
-                      initial={{ opacity: 0, y: 4 }}
-                      animate={i < settled ? { opacity: 1, y: 0 } : { opacity: 0, y: 4 }}
-                      transition={{ duration: 0.18, ease: EASE_OUT }}
-                    >
-                      {p.data?.name ?? (p.card.name.startsWith(p.card.issuer) ? p.card.name : `${p.card.issuer} ${p.card.name}`)}
-                    </motion.span>
-                    <motion.span
-                      className="ml-auto pl-4 text-sm tabular-nums text-neutral-500"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: i < settled ? 1 : 0 }}
-                      transition={{ duration: 0.18, delay: 0.06 }}
-                    >
-                      {p.data ? `$${Math.round(annual(p.data)).toLocaleString()}` : ''}
-                    </motion.span>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
+              <motion.div initial={false} animate={{ opacity: phase === 'pick' ? 1 : 0 }} transition={{ duration: 0.2 }}>
+                <p className="mt-1 h-5 text-sm text-neutral-400">in benefits a year</p>
+                <div className="mt-6">
+                  {picked.map((p, i) => (
+                    <div key={p.card.id} className="flex items-center" style={{ height: valueLine }}>
+                      <motion.div
+                        className="h-6 w-1 shrink-0 rounded-full bg-white"
+                        style={{
+                          boxShadow: `0 0 3px 1px ${p.data?.glowColor ?? 'rgb(255 255 255 / 0.5)'}, 0 0 8px 2px ${p.data?.glowColor ?? 'rgb(255 255 255 / 0.3)'}`,
+                        }}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: i < settled ? 1 : 0 }}
+                        transition={{ duration: 0.3 }}
+                      />
+                      <motion.span
+                        className="truncate pl-2 text-base font-medium"
+                        style={{ color: p.data?.textColor ?? 'rgb(255 255 255)' }}
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={i < settled ? { opacity: 1, y: 0 } : { opacity: 0, y: 4 }}
+                        transition={{ duration: 0.18, ease: EASE_OUT }}
+                      >
+                        {p.data?.name ?? (p.card.name.startsWith(p.card.issuer) ? p.card.name : `${p.card.issuer} ${p.card.name}`)}
+                      </motion.span>
+                      <motion.span
+                        className="ml-auto pl-4 text-sm tabular-nums text-neutral-500"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: i < settled ? 1 : 0 }}
+                        transition={{ duration: 0.18, delay: 0.06 }}
+                      >
+                        {p.data ? `$${Math.round(annual(p.data)).toLocaleString()}` : ''}
+                      </motion.span>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            </div>
           )}
 
           {layout === 'value' ? (
