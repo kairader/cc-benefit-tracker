@@ -20,7 +20,7 @@ import { CardFan, CARD_H, CARD_W, type FlickOrigin } from './card-fan'
 import { Rolodex } from './rolodex'
 import { fx, reducedMotion, tune, useTune } from './tune'
 import { TunePanel } from './tune-panel'
-import { openRowSpot, overlapSpot, rowFitWidth, rowSpot, spreadSpot, stackSpot } from './spread'
+import { gridSpot, overlapSpot, rowFitWidth, spreadSpot, stackSpot } from './spread'
 
 type Phase = 'pick' | 'loading' | 'landing' | 'home'
 
@@ -122,8 +122,8 @@ function glassLayers(fade: number) {
 export function Onboarding() {
   const [phase, setPhase] = useState<Phase>('pick')
   const [picked, setPicked] = useState<Picked[]>([])
-  // How many picks have landed, in order. The row lays these out centred;
-  // later ones head for the open places after them.
+  // How many picks have landed, in order. In the row, a card that hasn't
+  // landed heads for the open slot; one that has takes its column.
   const [settled, setSettled] = useState(0)
   const [barRects, setBarRects] = useState<Record<string, DOMRect>>({})
   const [tick, setTick] = useState(0)
@@ -206,8 +206,9 @@ export function Onboarding() {
   }, [phase, picked.length])
 
   // Dealt cards gather a set gap under the nav bar, in the layout chosen in
-  // the tuning panel. The row shows an open place for the next card; a card
-  // lands right in it, and the row only centres itself again once it has.
+  // the tuning panel. The row shows an open slot for the next card and each
+  // card lands right in it; a row's first card then slides left so the next
+  // open slot can sit in the middle.
   const layout = LAYOUTS[tune.landing.get()] ?? 'row'
   const perRow = tune.rowPerRow.get()
   const cardWidth = {
@@ -224,7 +225,7 @@ export function Onboarding() {
   const spotFor = (index: number, count: number) => {
     switch (layout) {
       case 'row':
-        return rowSpot(index, count, zone, row)
+        return gridSpot(index, true, zone, row)
       case 'overlap':
         return overlapSpot(index, count, zone, { cardW: cardWidth, cardH, step: tune.overlapStep.get(), maxWidth: viewport.w - 32 })
       case 'stack':
@@ -241,9 +242,9 @@ export function Onboarding() {
   }
   const pickSpot = (index: number) => {
     if (layout !== 'row') return spotFor(index, picked.length)
-    return index < settled ? rowSpot(index, settled, zone, row) : openRowSpot(index, settled, zone, row)
+    return gridSpot(index, index < settled, zone, row)
   }
-  const nextSpot = layout === 'row' ? openRowSpot(settled, settled, zone, row) : spotFor(picked.length, picked.length + 1)
+  const nextSpot = layout === 'row' ? gridSpot(settled, false, zone, row) : spotFor(picked.length, picked.length + 1)
 
   const targetFor = (index: number, origin: FlickOrigin, at: Phase = phase): Target => {
     const base = { width: CARD_W, height: CARD_H, radius: 12, faceOpacity: 1, opacity: 1, deal: false }
@@ -357,7 +358,7 @@ export function Onboarding() {
             // and a faint fill, with no glow (light is kept for the home
             // screen, where it stands for money). The next card lands in it.
             // Then this one goes and a new one is drawn at the next place,
-            // once the row has centred itself.
+            // once a row's first card has slid out of the middle.
             <motion.div
               key={settled}
               aria-hidden

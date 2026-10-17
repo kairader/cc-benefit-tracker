@@ -1,10 +1,9 @@
 // Where dealt cards come to rest. Spots are designed rather than thrown, so
-// every take lands the same way. The stack at the end of this file is the
-// layout; the angled spread is the earlier one, kept to compare (tune:
-// Angled spread). It hangs just under the title: each new card joins the row
-// on the right and the row re-centres; past a full row, a new row starts
-// below, covering only the bottoms of the cards above so their logos stay
-// readable.
+// every take lands the same way. The row is the layout; the others are kept
+// to compare in the tuning panel. The angled spread is the earliest: it hangs
+// just under the title, each new card joins the row on the right and the row
+// re-centres; past a full row, a new row starts below, covering only the
+// bottoms of the cards above so their logos stay readable.
 
 export interface Spot {
   x: number
@@ -71,14 +70,17 @@ export interface RowOptions {
 }
 
 // Whole small cards side by side, like a collection laid out on a table:
-// each row centred, a new row below once one fills. Nothing overlaps and
-// nothing turns, so the picks read as a set apart from the drum.
-export function rowSpot(index: number, count: number, zone: Zone, o: RowOptions): Spot {
+// three columns filled left to right, a new row below once one fills.
+// Nothing overlaps and nothing turns, so the picks read as a set apart from
+// the drum. A row's first card is dealt to the middle, where its open slot
+// is; once it lands it slides to the left column, so the open slot for the
+// next card can sit in the middle too.
+export function gridSpot(index: number, landed: boolean, zone: Zone, o: RowOptions): Spot {
   const row = Math.floor(index / o.perRow)
   const col = index % o.perRow
-  const inRow = Math.min(o.perRow, count - row * o.perRow)
+  const step = o.cardW + o.gap
   return {
-    x: zone.centerX + (col - (inRow - 1) / 2) * (o.cardW + o.gap),
+    x: !landed && col === 0 ? zone.centerX : zone.centerX + (col - (o.perRow - 1) / 2) * step,
     y: zone.top + o.cardH / 2 + row * (o.cardH + o.gap),
     rotate: 0,
   }
@@ -103,23 +105,7 @@ export function overlapSpot(index: number, count: number, zone: Zone, o: Overlap
   }
 }
 
-// Where a card goes before its row settles: the open place straight after
-// the last settled card in its row, or the middle of a new row. Settled
-// cards stay put while it's on its way; once it lands, the row centres
-// itself again with it included.
-export function openRowSpot(index: number, settled: number, zone: Zone, o: RowOptions): Spot {
-  const row = Math.floor(index / o.perRow)
-  const step = o.cardW + o.gap
-  const y = zone.top + o.cardH / 2 + row * (o.cardH + o.gap)
-  if (settled > 0 && row === Math.floor((settled - 1) / o.perRow)) {
-    const last = rowSpot(settled - 1, settled, zone, o)
-    return { x: last.x + (index - settled + 1) * step, y, rotate: 0 }
-  }
-  return { x: zone.centerX + (index % o.perRow) * step, y, rotate: 0 }
-}
-
-// The widest card that keeps the open place on screen when a row is one card
-// short of full: the settled cards centred, the open place hanging after them.
+// The widest card that lets a full row fit across the screen.
 export function rowFitWidth(perRow: number, gap: number, halfWidth: number) {
-  return (halfWidth - (perRow * gap) / 2) / ((perRow + 1) / 2)
+  return (halfWidth * 2 - (perRow - 1) * gap) / perRow
 }
