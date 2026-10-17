@@ -20,7 +20,7 @@ import { CardFan, CARD_H, CARD_W, type FlickOrigin } from './card-fan'
 import { Rolodex } from './rolodex'
 import { fx, reducedMotion, tune, useTune } from './tune'
 import { TunePanel } from './tune-panel'
-import { overlapSpot, rowSpot, spreadSpot, stackSpot } from './spread'
+import { openRowSpot, overlapSpot, rowFitWidth, rowSpot, spreadSpot, stackSpot } from './spread'
 
 type Phase = 'pick' | 'loading' | 'landing' | 'home'
 
@@ -122,6 +122,9 @@ function glassLayers(fade: number) {
 export function Onboarding() {
   const [phase, setPhase] = useState<Phase>('pick')
   const [picked, setPicked] = useState<Picked[]>([])
+  // How many picks have landed, in order. The row lays these out centred;
+  // later ones head for the open places after them.
+  const [settled, setSettled] = useState(0)
   const [barRects, setBarRects] = useState<Record<string, DOMRect>>({})
   const [tick, setTick] = useState(0)
   const [exhale, setExhale] = useState(0)
@@ -203,11 +206,12 @@ export function Onboarding() {
   }, [phase, picked.length])
 
   // Dealt cards gather a set gap under the nav bar, in the layout chosen in
-  // the tuning panel. The row keeps a place open for the next card, so its
-  // empty slot is always part of the layout.
+  // the tuning panel. The row shows an open place for the next card; a card
+  // lands right in it, and the row only centres itself again once it has.
   const layout = LAYOUTS[tune.landing.get()] ?? 'row'
+  const perRow = tune.rowPerRow.get()
   const cardWidth = {
-    row: tune.rowWidth.get(),
+    row: Math.min(tune.rowWidth.get(), Math.floor(rowFitWidth(perRow, tune.rowGap.get(), viewport.w / 2 - 16) / 4) * 4),
     overlap: tune.overlapWidth.get(),
     stack: tune.stackWidth.get(),
     angled: tune.pileScale.get() * CARD_W,
@@ -216,10 +220,11 @@ export function Onboarding() {
   const glassFade = tune.glassFade.get()
   const zone = { top: navBottom + tune.titleGap.get(), centerX: viewport.w / 2 }
   const cardH = CARD_H * pileScale
+  const row = { cardW: cardWidth, cardH, gap: tune.rowGap.get(), perRow }
   const spotFor = (index: number, count: number) => {
     switch (layout) {
       case 'row':
-        return rowSpot(index, count, zone, { cardW: cardWidth, cardH, gap: tune.rowGap.get(), perRow: 3 })
+        return rowSpot(index, count, zone, row)
       case 'overlap':
         return overlapSpot(index, count, zone, { cardW: cardWidth, cardH, step: tune.overlapStep.get(), maxWidth: viewport.w - 32 })
       case 'stack':
@@ -234,13 +239,16 @@ export function Onboarding() {
         })
     }
   }
-  const laidOut = layout === 'row' ? picked.length + 1 : picked.length
-  const nextSpot = spotFor(picked.length, picked.length + 1)
+  const pickSpot = (index: number) => {
+    if (layout !== 'row') return spotFor(index, picked.length)
+    return index < settled ? rowSpot(index, settled, zone, row) : openRowSpot(index, settled, zone, row)
+  }
+  const nextSpot = layout === 'row' ? openRowSpot(settled, settled, zone, row) : spotFor(picked.length, picked.length + 1)
 
   const targetFor = (index: number, origin: FlickOrigin, at: Phase = phase): Target => {
     const base = { width: CARD_W, height: CARD_H, radius: 12, faceOpacity: 1, opacity: 1, deal: false }
     if (at === 'pick') {
-      const spot = spotFor(index, laidOut)
+      const spot = pickSpot(index)
       return {
         ...base,
         ...spot,
@@ -293,6 +301,7 @@ export function Onboarding() {
   const totalFound = benefits.reduce((sum, b) => sum + b.value * PER_YEAR[b.cycle], 0)
 
   const handleLand = (i: number) => {
+    setSettled((s) => Math.max(s, i + 1))
     caught.current.add(picked[i].card.id)
     if (!exhale && DATA_IDS.every((id) => caught.current.has(id))) setExhale(1)
   }
@@ -343,33 +352,48 @@ export function Onboarding() {
                 style={{ width: CARD_W * pileScale, height: CARD_H * pileScale }}
               />
             </motion.div>
-          ) : (
-            // An empty card-shaped slot: a hairline and a faint fill, with no
-            // glow (light is kept for the home screen, where it stands for
-            // money). In the row it waits at the next place and moves on once
-            // the card heading for it arrives. Elsewhere it marks where the
-            // first card goes, and after that the cards themselves are the
-            // target.
+          ) : layout === 'row' ? (
+            // The open place in the row: an empty card-shaped slot, a hairline
+            // and a faint fill, with no glow (light is kept for the home
+            // screen, where it stands for money). The next card lands in it.
+            // Then this one goes and a new one is drawn at the next place,
+            // once the row has centred itself.
             <motion.div
+              key={settled}
               aria-hidden
               className="pointer-events-none absolute left-0 top-0"
-              initial={false}
-              animate={{
-                x: nextSpot.x,
-                y: layout === 'row' ? nextSpot.y : spotFor(0, 1).y,
-                opacity: phase === 'pick' && (layout === 'row' || picked.length === 0) ? 1 : 0,
-              }}
+              initial={{ x: nextSpot.x, y: nextSpot.y, opacity: 0 }}
+              animate={{ x: nextSpot.x, y: nextSpot.y, opacity: phase === 'pick' ? 1 : 0 }}
               transition={{
                 type: 'spring',
                 visualDuration: 0.4,
                 bounce: 0,
-                delay: picked.length ? tune.flightDuration.get() * 0.6 : 0,
-                opacity: { duration: 0.2, delay: layout === 'row' || !picked.length ? 0 : tune.flightDuration.get() },
+                opacity: { duration: 0.25, delay: phase === 'pick' && settled ? 0.4 : 0 },
               }}
             >
               <div
                 className="-translate-x-1/2 -translate-y-1/2 border border-white/10 bg-white/[0.03]"
-                style={{ width: CARD_W * pileScale, height: CARD_H * pileScale, borderRadius: 12 * pileScale }}
+                style={{ width: cardWidth, height: cardH, borderRadius: 12 * pileScale }}
+              />
+            </motion.div>
+          ) : (
+            // Where the first card goes, the same empty slot. After that the
+            // cards themselves are the target and the slot goes.
+            <motion.div
+              aria-hidden
+              className="pointer-events-none absolute left-0 top-0"
+              initial={false}
+              animate={{ x: spotFor(0, 1).x, y: spotFor(0, 1).y, opacity: phase === 'pick' && picked.length === 0 ? 1 : 0 }}
+              transition={{
+                type: 'spring',
+                visualDuration: 0.4,
+                bounce: 0,
+                opacity: { duration: 0.2, delay: picked.length ? tune.flightDuration.get() : 0 },
+              }}
+            >
+              <div
+                className="-translate-x-1/2 -translate-y-1/2 border border-white/10 bg-white/[0.03]"
+                style={{ width: cardWidth, height: cardH, borderRadius: 12 * pileScale }}
               />
             </motion.div>
           )}

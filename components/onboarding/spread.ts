@@ -71,8 +71,8 @@ export interface RowOptions {
 }
 
 // Whole small cards side by side, like a collection laid out on a table:
-// rows of three, each row centred, a new row below once one fills. Nothing
-// overlaps and nothing turns, so the picks read as a set apart from the drum.
+// each row centred, a new row below once one fills. Nothing overlaps and
+// nothing turns, so the picks read as a set apart from the drum.
 export function rowSpot(index: number, count: number, zone: Zone, o: RowOptions): Spot {
   const row = Math.floor(index / o.perRow)
   const col = index % o.perRow
@@ -101,4 +101,25 @@ export function overlapSpot(index: number, count: number, zone: Zone, o: Overlap
     y: zone.top + o.cardH / 2,
     rotate: 0,
   }
+}
+
+// Where a card goes before its row settles: the open place straight after
+// the last settled card in its row, or the middle of a new row. Settled
+// cards stay put while it's on its way; once it lands, the row centres
+// itself again with it included.
+export function openRowSpot(index: number, settled: number, zone: Zone, o: RowOptions): Spot {
+  const row = Math.floor(index / o.perRow)
+  const step = o.cardW + o.gap
+  const y = zone.top + o.cardH / 2 + row * (o.cardH + o.gap)
+  if (settled > 0 && row === Math.floor((settled - 1) / o.perRow)) {
+    const last = rowSpot(settled - 1, settled, zone, o)
+    return { x: last.x + (index - settled + 1) * step, y, rotate: 0 }
+  }
+  return { x: zone.centerX + (index % o.perRow) * step, y, rotate: 0 }
+}
+
+// The widest card that keeps the open place on screen when a row is one card
+// short of full: the settled cards centred, the open place hanging after them.
+export function rowFitWidth(perRow: number, gap: number, halfWidth: number) {
+  return (halfWidth - (perRow * gap) / 2) / ((perRow + 1) / 2)
 }
