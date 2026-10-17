@@ -35,7 +35,13 @@ interface Picked {
 // Makes the front card 320 wide, so the stack's edges land on the 4px grid.
 const STACK_SCALE = 320 / CARD_W
 // The landing layouts, in the order the tuning panel lists them.
-const LAYOUTS = ['row', 'overlap', 'stack', 'angled'] as const
+const LAYOUTS = ['row', 'overlap', 'stack', 'angled', 'value'] as const
+type Layout = (typeof LAYOUTS)[number]
+// The value layout's list, matching the home screen's card headers: a total
+// and its caption, then a 40px line per card with a 4x24 glow bar at its left.
+const VALUE_HEAD = 56 + 24
+const VALUE_LINE = 40
+const annual = (card?: Card) => card?.benefits.reduce((sum, b) => sum + b.value * PER_YEAR[b.cycle], 0) ?? 0
 const LOADING_MS = 1700
 
 const EASE_OUT = [0.22, 1, 0.36, 1] as const
@@ -136,6 +142,10 @@ export function Onboarding() {
   // ?fan shows the earlier fanned hand instead of the rolodex.
   const [fan] = useState(() => new URLSearchParams(window.location.search).has('fan'))
   useTune()
+  // ?layout=value (or any layout's name) shows that layout whatever the
+  // tuning panel says, so a prototype can be shared as a link.
+  const [layoutParam] = useState(() => new URLSearchParams(window.location.search).get('layout'))
+  const layout: Layout = LAYOUTS.find((l) => l === layoutParam) ?? LAYOUTS[tune.landing.get()] ?? 'row'
   const navRef = useRef<HTMLElement>(null)
   const [navBottom, setNavBottom] = useState(44)
   const viewport = useViewport()
@@ -192,12 +202,14 @@ export function Onboarding() {
         setCounterTo({ x: b.left - a.left, y: b.top + b.height / 2 - (a.top + (a.height * scale) / 2), scale })
       }
       setPhase('landing')
-    }, LOADING_MS + 450)
+      // The value layout has already shown what the cards are worth, so it
+      // goes straight on to the home screen.
+    }, layout === 'value' ? 300 : LOADING_MS + 450)
     return () => {
       clearInterval(timer)
       clearTimeout(done)
     }
-  }, [phase, benefits.length, picked])
+  }, [phase, benefits.length, picked, layout])
 
   useEffect(() => {
     if (phase !== 'landing') return
@@ -209,21 +221,28 @@ export function Onboarding() {
   // the tuning panel. The row shows an open slot for the next card and each
   // card lands right in it; a row's first card then slides left so the next
   // open slot can sit in the middle.
-  const layout = LAYOUTS[tune.landing.get()] ?? 'row'
   const perRow = tune.rowPerRow.get()
   const cardWidth = {
     row: Math.min(tune.rowWidth.get(), Math.floor(rowFitWidth(perRow, tune.rowGap.get(), viewport.w / 2 - 16) / 4) * 4),
     overlap: tune.overlapWidth.get(),
     stack: tune.stackWidth.get(),
     angled: tune.pileScale.get() * CARD_W,
+    value: CARD_W,
   }[layout]
   const pileScale = cardWidth / CARD_W
   const glassFade = tune.glassFade.get()
   const zone = { top: navBottom + tune.titleGap.get(), centerX: viewport.w / 2 }
   const cardH = CARD_H * pileScale
   const row = { cardW: cardWidth, cardH, gap: tune.rowGap.get(), perRow }
+  // Value: lines tighten if there are too many to fit above the drum.
+  const valueLeft = Math.max(16, (viewport.w - 448) / 2 + 16)
+  const valueLine = Math.min(VALUE_LINE, (viewport.h - tune.stackRoom.get() - zone.top - VALUE_HEAD) / Math.max(1, picked.length))
+  const valueSpot = (index: number) => ({ x: valueLeft + 2, y: zone.top + VALUE_HEAD + index * valueLine + valueLine / 2, rotate: 0 })
+  const valueTotal = picked.slice(0, settled).reduce((sum, p) => sum + annual(p.data), 0)
   const spotFor = (index: number, count: number) => {
     switch (layout) {
+      case 'value':
+        return valueSpot(index)
       case 'row':
         return gridSpot(index, true, zone, row)
       case 'overlap':
@@ -248,6 +267,21 @@ export function Onboarding() {
 
   const targetFor = (index: number, origin: FlickOrigin, at: Phase = phase): Target => {
     const base = { width: CARD_W, height: CARD_H, radius: 12, faceOpacity: 1, opacity: 1, deal: false }
+    if (layout === 'value' && (at === 'pick' || at === 'loading')) {
+      // Flies up and folds into its glow line, flashing its own colour.
+      return {
+        ...base,
+        ...valueSpot(index),
+        width: 4,
+        height: 24,
+        scale: 1,
+        radius: 2,
+        faceOpacity: 0,
+        deal: true,
+        tint: { delay: 0 },
+        spring: same({ type: 'spring', visualDuration: 0.4, bounce: 0 }),
+      }
+    }
     if (at === 'pick') {
       const spot = pickSpot(index)
       return {
@@ -331,7 +365,73 @@ export function Onboarding() {
           animate={{ backgroundColor: phase === 'landing' ? 'rgba(10,10,10,0)' : 'rgba(10,10,10,1)' }}
           transition={{ duration: 0.4 }}
         >
-          {layout === 'angled' ? (
+          {layout === 'value' && (
+            // What the picks are worth: a running total, then a line per card
+            // like the home screen's, each with its glow bar. The card lands
+            // as the bar; its name and value show once it has.
+            <motion.div
+              aria-hidden={picked.length === 0}
+              className="pointer-events-none absolute"
+              style={{ left: valueLeft, right: valueLeft, top: zone.top }}
+              initial={false}
+              animate={{ opacity: phase === 'pick' ? 1 : 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <p
+                className="h-8 text-2xl font-medium tabular-nums transition-colors duration-300"
+                style={{ color: valueTotal ? 'rgb(255 255 255)' : 'rgb(115 115 115)' }}
+              >
+                <AnimatedNumber value={Math.round(valueTotal)} />
+              </p>
+              <p className="mt-1 h-5 text-sm text-neutral-400">in benefits a year</p>
+              <div className="mt-6">
+                {picked.map((p, i) => (
+                  <div key={p.card.id} className="flex items-center" style={{ height: valueLine }}>
+                    <motion.div
+                      className="h-6 w-1 shrink-0 rounded-full bg-white"
+                      style={{
+                        boxShadow: `0 0 3px 1px ${p.data?.glowColor ?? 'rgb(255 255 255 / 0.5)'}, 0 0 8px 2px ${p.data?.glowColor ?? 'rgb(255 255 255 / 0.3)'}`,
+                      }}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: i < settled ? 1 : 0 }}
+                      transition={{ duration: 0.3 }}
+                    />
+                    <motion.span
+                      className="truncate pl-2 text-base font-medium"
+                      style={{ color: p.data?.textColor ?? 'rgb(255 255 255)' }}
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={i < settled ? { opacity: 1, y: 0 } : { opacity: 0, y: 4 }}
+                      transition={{ duration: 0.18, ease: EASE_OUT }}
+                    >
+                      {p.data?.name ?? (p.card.name.startsWith(p.card.issuer) ? p.card.name : `${p.card.issuer} ${p.card.name}`)}
+                    </motion.span>
+                    <motion.span
+                      className="ml-auto pl-4 text-sm tabular-nums text-neutral-500"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: i < settled ? 1 : 0 }}
+                      transition={{ duration: 0.18, delay: 0.06 }}
+                    >
+                      {p.data ? `$${Math.round(annual(p.data)).toLocaleString()}` : ''}
+                    </motion.span>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {layout === 'value' ? (
+            // The next line's place: a faint bar where the next card lands.
+            <motion.div
+              key={settled}
+              aria-hidden
+              className="pointer-events-none absolute left-0 top-0"
+              initial={{ x: valueSpot(settled).x, y: valueSpot(settled).y, opacity: 0 }}
+              animate={{ x: valueSpot(settled).x, y: valueSpot(settled).y, opacity: phase === 'pick' ? 1 : 0 }}
+              transition={{ type: 'spring', visualDuration: 0.4, bounce: 0, opacity: { duration: 0.25, delay: phase === 'pick' && settled ? 0.3 : 0 } }}
+            >
+              <div className="h-6 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/15" />
+            </motion.div>
+          ) : layout === 'angled' ? (
             // The old spread's marker: a card-shaped outline with a soft
             // neutral glow at the next spot. It slides on once the card
             // heading for it arrives.
@@ -498,7 +598,7 @@ export function Onboarding() {
           </AnimatePresence>
 
           <AnimatePresence>
-            {(phase === 'loading' || phase === 'landing') && (
+            {layout !== 'value' && (phase === 'loading' || phase === 'landing') && (
               <motion.div
                 className="absolute inset-x-0 text-center"
                 style={{ top: stackY + (CARD_H * STACK_SCALE) / 2 + 44 }}
@@ -648,6 +748,8 @@ function FlyingCard({ picked, target, onLand }: { picked: Picked; target: Target
       const duration = tune.flightDuration.get()
       const back = [0.34, tune.overshoot.get(), 0.64, 1] as const
       const out = [0.25, 1, 0.5, 1] as const
+      // Dealt into a glow line, it folds into the bar over the second half.
+      const fold = { duration: duration * 0.6, delay: duration * 0.3, ease: [0.4, 0, 0.2, 1] as const }
       const runs = [
         animate(x, t.x, { duration, ease: out }),
         animate(y, t.y, { duration, ease: back }),
@@ -655,6 +757,8 @@ function FlyingCard({ picked, target, onLand }: { picked: Picked; target: Target
         animate(pitch, 0, { duration: duration * 0.7, ease: out }),
         animate(scale, t.scale, { duration: duration * 0.75, ease: out }),
         animate(radius, t.radius, { duration: duration * 0.75, ease: out }),
+        animate(foldX, t.width / CARD_W, fold),
+        animate(foldY, t.height / CARD_H, fold),
       ]
       const air = duration * 0.85
       const flight = animate(hop, [0, fx('toss'), 0], { duration: air, times: [0, 0.4, 1], ease: ['easeOut', 'easeIn'] })
